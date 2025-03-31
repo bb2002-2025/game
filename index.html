@@ -1,882 +1,893 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8" />
-  <title>About Bruno</title>
-  <style>
-    /* Removed custom font to reduce Safari overhead; using system font ("monospace") now */
-
-    /* No scrollbars, full screen */
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #000;
-      overflow: hidden;
-    }
-
-    /* Canvas is 414×736 internally but will be stretched fullscreen by CSS */
-    #gameCanvas {
-      display: block;
-      margin: 0 auto;
-      background: black;
-      width: 100vw;  /* Stretch to viewport width */
-      height: 100vh; /* Stretch to viewport height */
-      will-change: transform;
-      -webkit-transform: translateZ(0);
-      backface-visibility: hidden;
-    }
-  </style>
-</head>
-<body>
-
-  <!-- Fixed internal resolution of 414×736 -->
-  <canvas id="gameCanvas" width="414" height="736"></canvas>
-
-  <script>
-    //==================================================
-    // CONFIGURATION: Tweak all key values here
-    //==================================================
-    const CONFIG = {
-      designWidth: 414,
-      designHeight: 736,
-      groundRatio: 0.8,
-      physics: {
-        gravity: 0.1,
-        flapForce: -5,
-        maxFallSpeed: 3
-      },
-      bird: {
-        startX: 100,
-        startY: 300,
-        width: 120,
-        height: 120,
-        rotationUp: 20,
-        rotationDown: 90,
-        flapDuration: 300,
-        flapFrameTime: 50
-      },
-      hitboxes: {
-        enabled: false,
+  <head>
+    <meta charset="UTF-8" />
+    <title>About Bruno</title>
+    <style>
+      @font-face {
+        font-family: '8-bit Arcade In';
+        src: url('assets/8-bit Arcade In.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+      }
+      /* No scrollbars, full screen black background */
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        overflow: hidden;
+      }
+      /* Canvas will be letterboxed in JS – just center it here */
+      #gameCanvas {
+        display: block;
+        margin: 0 auto;
+        background: black;
+        will-change: transform;
+        -webkit-transform: translateZ(0);
+        backface-visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+      //==================================================
+      // CONFIGURATION & GLOBALS
+      //==================================================
+      const CONFIG = {
+        designWidth: 414,
+        designHeight: 736,
+        groundRatio: 0.8,
+        physics: {
+          gravity: 0.1,
+          flapForce: -5,
+          maxFallSpeed: 3
+        },
         bird: {
-          scale: 0.3,
-          color: "red",
-          lineWidth: 1
+          startX: 100,
+          startY: 300,
+          width: 120,
+          height: 120,
+          rotationUp: 20,
+          rotationDown: 90,
+          flapDuration: 300,
+          flapFrameTime: 50
+        },
+        hitboxes: {
+          enabled: false,
+          bird: { scale: 0.3, color: "red", lineWidth: 1 },
+          pipe: { color: "lime", lineWidth: 1 },
+          floor: { color: "blue", lineWidth: 2 }
         },
         pipe: {
-          color: "lime",
-          lineWidth: 1
+          spacing: 550,
+          gap: 200,
+          defaultWidth: 52,
+          defaultHeight: 320,
+          minEdgeDistance: 60,
+          startingDistance: 600
         },
-        floor: {
-          color: "blue",
-          lineWidth: 2
-        }
-      },
-      pipe: {
-        spacing: 550,
-        gap: 200,
-        defaultWidth: 52,
-        defaultHeight: 320,
-        minEdgeDistance: 60,
-        startingDistance: 600
-      },
-      speeds: {
-        scrollSpeed: 1.5,
-        bgScrollSpeed: 0.5
-      },
-      // Reduced maxAlpha from 180 to 80 to lessen the heavy alpha draws
-      flash: {
-        speed: 10,
-        maxAlpha: 80
-      },
-      vita: {
-        max: 12,
-        scale: 0.6,
-        fadeInSpeed: 0.01,
-        fadeOutSpeed: 0.01,
-        fadeDistance: 500
-      },
-      // Replaced custom font with a system font for Safari performance
-      scoreFont: "78px monospace",
-      scorePosition: {
-        x: 0.5,
-        y: 736 * 0.92
-      },
-      ui: {
-        scale: 1.5,
-        minMargin: 20,
-        maxWidthPercent: 0.9,
-        gameOver: {
-          scale: 3.0,
-          cooldownPeriod: 800,
-          grid: {
-            rows: 4,
-            cols: 5,
-            activeMinRow: 1,
-            activeMaxRow: 3,
-            activeMinCol: 1,
-            activeMaxCol: 3
+        speeds: {
+          scrollSpeed: 1.5,
+          bgScrollSpeed: 0.5
+        },
+        // Lowered to reduce big alpha draws in Safari
+        flash: {
+          speed: 10,
+          maxAlpha: 80
+        },
+        vita: {
+          max: 12,
+          scale: 0.6,
+          fadeInSpeed: 0.01,
+          fadeOutSpeed: 0.01,
+          fadeDistance: 500
+        },
+        // Using a bit smaller than 78px to avoid huge text. 
+        // We'll re-introduce strokeText for a black outline.
+        scoreFont: "60px '8-bit Arcade In'",
+        scorePosition: {
+          x: 0.5,
+          y: 736 * 0.92
+        },
+        ui: {
+          scale: 1.5,
+          minMargin: 20,
+          maxWidthPercent: 0.9,
+          gameOver: {
+            scale: 3.0,
+            cooldownPeriod: 800,
+            grid: {
+              rows: 4,
+              cols: 5,
+              activeMinRow: 1,
+              activeMaxRow: 3,
+              activeMinCol: 1,
+              activeMaxCol: 3
+            }
+          },
+          pause: {
+            buttonSize: 60,
+            margin: 6,
+            popupScale: 1
           }
         },
-        pause: {
-          buttonSize: 60,
-          margin: 6,
-          popupScale: 1
+        ground: {
+          overlap: 1
         }
-      },
-      ground: {
-        overlap: 1
+      };
+
+      // Canvas, context, scaling
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      ctx.webkitImageSmoothingEnabled = false;
+
+      // We'll dynamically set canvas size to preserve aspect ratio
+      let scaleFactor = 1;     // how many screen pixels per design pixel
+      let worldWidth = CONFIG.designWidth;
+      let worldHeight = CONFIG.designHeight;
+
+      function resizeCanvas() {
+        const designRatio = CONFIG.designWidth / CONFIG.designHeight;
+        const windowRatio = window.innerWidth / window.innerHeight;
+        let newWidth, newHeight;
+
+        if (windowRatio > designRatio) {
+          // Letterbox horizontally
+          newHeight = window.innerHeight;
+          newWidth = newHeight * designRatio;
+        } else {
+          // Letterbox vertically
+          newWidth = window.innerWidth;
+          newHeight = newWidth / designRatio;
+        }
+        canvas.width = Math.round(newWidth);
+        canvas.height = Math.round(newHeight);
+
+        // Scale factor: ratio of current canvas size to the design size
+        scaleFactor = canvas.height / CONFIG.designHeight;
+        worldWidth = canvas.width / scaleFactor;
+        worldHeight = canvas.height / scaleFactor;
       }
-    };
 
-    //==================================================
-    // GLOBALS & INITIAL SETUP
-    //==================================================
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    // Disable smoothing (with vendor prefix)
-    ctx.imageSmoothingEnabled = false;
-    ctx.webkitImageSmoothingEnabled = false;
+      window.addEventListener("resize", resizeCanvas);
 
-    // Fixed internal resolution: 414×736 (no dynamic resize).
-    const scaleFactor = 1;        // We won't scale internally
-    const worldWidth = CONFIG.designWidth;
-    const worldHeight = CONFIG.designHeight;
-    const groundY = CONFIG.designHeight * CONFIG.groundRatio;
+      //==================================================
+      // GAME VARIABLES
+      //==================================================
+      const groundY = CONFIG.designHeight * CONFIG.groundRatio;
+      let gameState = "menu"; // "menu", "play", "gameover"
+      let score = 0;
+      let pipes = [];
+      let groundSegments = [];
+      let vitaSprites = [];
+      let bird = {
+        x: CONFIG.bird.startX,
+        y: CONFIG.bird.startY,
+        width: CONFIG.bird.width,
+        height: CONFIG.bird.height,
+        vel: 0,
+        rotation: 0,
+        alive: true,
+        grounded: false,
+        spriteIndex: 0,
+        frameTimer: 0
+      };
 
-    let gameState = "menu"; // "menu", "play", "gameover"
-    let score = 0;
-    let pipes = [];
-    let groundSegments = [];
-    let vitaSprites = [];
-    let bird = {
-      x: CONFIG.bird.startX,
-      y: CONFIG.bird.startY,
-      width: CONFIG.bird.width,
-      height: CONFIG.bird.height,
-      vel: 0,
-      rotation: 0,
-      alive: true,
-      grounded: false,
-      spriteIndex: 0,
-      frameTimer: 0
-    };
-    let birdFrames = [];
-    let bgScroll = 0;
-    let flashAlpha = 0;
-    let vitaCounter = 0;
-    let lastTime = 0;
-    let gameOverUI = { x: 0, y: 0, width: 0, height: 0, cellWidth: 0, cellHeight: 0 };
-    let gamePaused = false;
-    let pauseUI = { x: 0, y: 0, width: 0, height: 0, rowHeight: 0 };
-    let gameOverTimer = 0;
-    let flapStartTime = 0;
-    let isFlapping = false;
+      let birdFrames = [];
+      let bgScroll = 0;
+      let flashAlpha = 0;
+      let vitaCounter = 0;
+      let lastTime = 0;
+      let gameOverUI = { x: 0, y: 0, width: 0, height: 0, cellWidth: 0, cellHeight: 0 };
+      let gamePaused = false;
+      let pauseUI = { x: 0, y: 0, width: 0, height: 0, rowHeight: 0 };
+      let gameOverTimer = 0;
+      let flapStartTime = 0;
+      let isFlapping = false;
 
-    //==================================================
-    // IMAGE LOADING
-    //==================================================
-    const imageList = [
-      { name: "head_normal", src: "assets/head_normal.png" },
-      { name: "head_1", src: "assets/head_1.png" },
-      { name: "head_2", src: "assets/head_2.png" },
-      { name: "head_3", src: "assets/head_3.png" },
-      { name: "head_4", src: "assets/head_4.png" },
-      { name: "pipe_top", src: "assets/pipe_top.png" },
-      { name: "pipe_bottom", src: "assets/pipe_bottom.png" },
-      { name: "ground", src: "assets/ground_new.png" },
-      { name: "skyline", src: "assets/custom_skyline.png" },
-      { name: "start", src: "assets/custom_start.png" },
-      { name: "game_over", src: "assets/game_over.png" },
-      { name: "tutorial", src: "assets/tutorial.png" },
-      { name: "vita_1", src: "assets/vita_1.png" },
-      { name: "vita_2", src: "assets/vita_2.png" },
-      { name: "vita_3", src: "assets/vita_3.png" },
-      { name: "vita_4", src: "assets/vita_4.png" },
-      { name: "vita_5", src: "assets/vita_5.png" },
-      { name: "vita_6", src: "assets/vita_6.png" },
-      { name: "vita_7", src: "assets/vita_7.png" },
-      { name: "vita_8", src: "assets/vita_8.png" },
-      { name: "vita_9", src: "assets/vita_9.png" },
-      { name: "vita_10", src: "assets/vita_10.png" },
-      { name: "vita_11", src: "assets/vita_11.png" },
-      { name: "vita_12", src: "assets/vita_12.png" },
-      { name: "pause", src: "assets/pause.png" },
-      { name: "pause_2", src: "assets/pause_2.png" }
-    ];
-    const ASSETS = {};
-
-    function loadAllImages(list, callback) {
-      let loadedCount = 0;
-      for (let i = 0; i < list.length; i++) {
-        const item = list[i];
-        const img = new Image();
-        img.src = item.src;
-        img.onload = function() {
-          ASSETS[item.name] = img;
-          loadedCount++;
-          if (loadedCount === list.length) callback();
-        };
-        img.onerror = function() {
-          console.warn("Failed to load image:", item.src);
-          loadedCount++;
-          if (loadedCount === list.length) callback();
-        };
-      }
-    }
-
-    //==================================================
-    // INITIAL SETUP AFTER IMAGES LOADED
-    //==================================================
-    function init() {
-      // Canvas is already 414×736. No dynamic resizing to reduce Safari overhead.
-      // Set up bird animation frames
-      birdFrames = [
-        ASSETS["head_normal"],
-        ASSETS["head_1"],
-        ASSETS["head_2"],
-        ASSETS["head_3"],
-        ASSETS["head_4"],
-        ASSETS["head_normal"]
+      //==================================================
+      // IMAGE LOADING
+      //==================================================
+      const imageList = [
+        { name: "head_normal", src: "assets/head_normal.png" },
+        { name: "head_1", src: "assets/head_1.png" },
+        { name: "head_2", src: "assets/head_2.png" },
+        { name: "head_3", src: "assets/head_3.png" },
+        { name: "head_4", src: "assets/head_4.png" },
+        { name: "pipe_top", src: "assets/pipe_top.png" },
+        { name: "pipe_bottom", src: "assets/pipe_bottom.png" },
+        { name: "ground", src: "assets/ground_new.png" },
+        { name: "skyline", src: "assets/custom_skyline.png" },
+        { name: "start", src: "assets/custom_start.png" },
+        { name: "game_over", src: "assets/game_over.png" },
+        { name: "tutorial", src: "assets/tutorial.png" },
+        { name: "vita_1", src: "assets/vita_1.png" },
+        { name: "vita_2", src: "assets/vita_2.png" },
+        { name: "vita_3", src: "assets/vita_3.png" },
+        { name: "vita_4", src: "assets/vita_4.png" },
+        { name: "vita_5", src: "assets/vita_5.png" },
+        { name: "vita_6", src: "assets/vita_6.png" },
+        { name: "vita_7", src: "assets/vita_7.png" },
+        { name: "vita_8", src: "assets/vita_8.png" },
+        { name: "vita_9", src: "assets/vita_9.png" },
+        { name: "vita_10", src: "assets/vita_10.png" },
+        { name: "vita_11", src: "assets/vita_11.png" },
+        { name: "vita_12", src: "assets/vita_12.png" },
+        { name: "pause", src: "assets/pause.png" },
+        { name: "pause_2", src: "assets/pause_2.png" }
       ];
 
-      resetGame();
-      window.requestAnimationFrame(gameLoop);
-    }
-
-    function resetGame() {
-      gameState = "menu";
-      score = 0;
-      flashAlpha = 0;
-      bgScroll = 0;
-      vitaCounter = 0;
-      pipes = [];
-      groundSegments = [];
-      vitaSprites = [];
-      bird.x = CONFIG.bird.startX;
-      bird.y = CONFIG.bird.startY;
-      bird.vel = 0;
-      bird.alive = true;
-      bird.grounded = false;
-      bird.rotation = 0;
-      bird.spriteIndex = 0;
-      bird.frameTimer = 0;
-
-      let groundWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
-      const neededSegments = Math.ceil(worldWidth / groundWidth) + 4;
-      for (let i = 0; i < neededSegments; i++) {
-        groundSegments.push({
-          x: i * (groundWidth - CONFIG.ground.overlap),
-          y: groundY,
-          width: groundWidth
-        });
-      }
-
-      // Prepare initial pipes
-      const initialX = CONFIG.pipe.startingDistance;
-      let countPipes = Math.max(2, Math.ceil((worldWidth - initialX) / CONFIG.pipe.spacing) + 1);
-      for (let i = 0; i < countPipes; i++) {
-        spawnPipeSet(initialX + i * CONFIG.pipe.spacing);
-      }
-    }
-
-    //==================================================
-    // GAME LOOP
-    //==================================================
-    function gameLoop(timestamp) {
-      let dt = timestamp - lastTime;
-      dt = Math.min(dt, 50);
-      lastTime = timestamp;
-      update(dt);
-      draw();
-      window.requestAnimationFrame(gameLoop);
-    }
-
-    //==================================================
-    // UPDATE LOGIC
-    //==================================================
-    function update(dt) {
-      if (gamePaused) return;
-
-      if (gameState === "menu") {
-        // Hide vita sprites
-        for (let i = 0; i < vitaSprites.length; i++) {
-          vitaSprites[i].opacity = 0;
+      const ASSETS = {};
+      function loadAllImages(list, callback) {
+        let loadedCount = 0;
+        for (let i = 0; i < list.length; i++) {
+          const item = list[i];
+          const img = new Image();
+          img.src = item.src;
+          img.onload = function() {
+            ASSETS[item.name] = img;
+            loadedCount++;
+            if (loadedCount === list.length) callback();
+          };
+          img.onerror = function() {
+            console.warn("Failed to load image:", item.src);
+            loadedCount++;
+            if (loadedCount === list.length) callback();
+          };
         }
       }
-      else if (gameState === "play") {
-        // Parallax scroll
-        bgScroll -= CONFIG.speeds.bgScrollSpeed;
-        if (ASSETS["skyline"]) {
-          let sw = ASSETS["skyline"].width;
-          if (bgScroll <= -sw) bgScroll = 0;
-        }
 
-        updateBird();
+      //==================================================
+      // INITIAL SETUP AFTER IMAGES LOADED
+      //==================================================
+      function init() {
+        resizeCanvas(); // letterbox the canvas to avoid distortion
 
-        // Move pipes
-        for (let i = 0; i < pipes.length; i++) {
-          pipes[i].x -= CONFIG.speeds.scrollSpeed;
-        }
-        // Remove off-screen pipes
-        for (let i = pipes.length - 1; i >= 0; i--) {
-          if (pipes[i].x + pipes[i].width < 0) {
-            pipes.splice(i, 1);
-          }
-        }
-        // Possibly spawn new pipe set
-        let rightmost = (pipes.length > 0) ? pipes[0].x : worldWidth * 0.75;
-        for (let i = 1; i < pipes.length; i++) {
-          if (pipes[i].x > rightmost) {
-            rightmost = pipes[i].x;
-          }
-        }
-        if (rightmost < worldWidth) {
-          spawnPipeSet(rightmost + CONFIG.pipe.spacing);
-        }
+        // Bird animation frames
+        birdFrames = [
+          ASSETS["head_normal"],
+          ASSETS["head_1"],
+          ASSETS["head_2"],
+          ASSETS["head_3"],
+          ASSETS["head_4"],
+          ASSETS["head_normal"]
+        ];
 
-        // Move ground segments
-        for (let i = 0; i < groundSegments.length; i++) {
-          groundSegments[i].x -= CONFIG.speeds.scrollSpeed;
-        }
-        // Remove off-screen ground
-        for (let i = groundSegments.length - 1; i >= 0; i--) {
-          if (groundSegments[i].x + groundSegments[i].width < 0) {
-            groundSegments.splice(i, 1);
-          }
-        }
-        // Possibly add new ground
-        let groundImgWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
-        let rightmostX = 0;
-        if (groundSegments.length > 0) {
-          rightmostX = groundSegments[0].x + groundSegments[0].width;
-          for (let i = 1; i < groundSegments.length; i++) {
-            let segRight = groundSegments[i].x + groundSegments[i].width;
-            if (segRight > rightmostX) rightmostX = segRight;
-          }
-        }
-        if (rightmostX < worldWidth + groundImgWidth) {
+        resetGame();
+        window.requestAnimationFrame(gameLoop);
+      }
+
+      function resetGame() {
+        gameState = "menu";
+        score = 0;
+        flashAlpha = 0;
+        bgScroll = 0;
+        vitaCounter = 0;
+        pipes = [];
+        groundSegments = [];
+        vitaSprites = [];
+        bird.x = CONFIG.bird.startX;
+        bird.y = CONFIG.bird.startY;
+        bird.vel = 0;
+        bird.alive = true;
+        bird.grounded = false;
+        bird.rotation = 0;
+        bird.spriteIndex = 0;
+        bird.frameTimer = 0;
+
+        // Initialize ground
+        let groundWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
+        const neededSegments = Math.ceil(CONFIG.designWidth / groundWidth) + 4;
+        for (let i = 0; i < neededSegments; i++) {
           groundSegments.push({
-            x: rightmostX - CONFIG.ground.overlap,
+            x: i * (groundWidth - CONFIG.ground.overlap),
             y: groundY,
-            width: groundImgWidth
+            width: groundWidth
           });
         }
 
-        // Move vita sprites
-        for (let i = 0; i < vitaSprites.length; i++) {
-          vitaSprites[i].x -= CONFIG.speeds.scrollSpeed;
+        // Initial pipes
+        const initialX = CONFIG.pipe.startingDistance;
+        let countPipes = Math.max(
+          2,
+          Math.ceil((CONFIG.designWidth - initialX) / CONFIG.pipe.spacing) + 1
+        );
+        for (let i = 0; i < countPipes; i++) {
+          spawnPipeSet(initialX + i * CONFIG.pipe.spacing);
         }
-        // Remove off-screen vita
-        for (let i = vitaSprites.length - 1; i >= 0; i--) {
-          if (vitaSprites[i].x + vitaSprites[i].width < 0) {
-            vitaSprites.splice(i, 1);
+      }
+
+      //==================================================
+      // GAME LOOP
+      //==================================================
+      function gameLoop(timestamp) {
+        let dt = timestamp - lastTime;
+        dt = Math.min(dt, 50);
+        lastTime = timestamp;
+        update(dt);
+        draw();
+        window.requestAnimationFrame(gameLoop);
+      }
+
+      //==================================================
+      // UPDATE LOGIC
+      //==================================================
+      function update(dt) {
+        if (gamePaused) return;
+
+        if (gameState === "menu") {
+          // Hide vita sprites
+          for (let i = 0; i < vitaSprites.length; i++) {
+            vitaSprites[i].opacity = 0;
+          }
+        } else if (gameState === "play") {
+          // Scroll background
+          bgScroll -= CONFIG.speeds.bgScrollSpeed;
+          if (ASSETS["skyline"]) {
+            let sw = ASSETS["skyline"].width;
+            if (bgScroll <= -sw) bgScroll = 0;
+          }
+
+          updateBird();
+
+          // Move pipes
+          for (let i = 0; i < pipes.length; i++) {
+            pipes[i].x -= CONFIG.speeds.scrollSpeed;
+          }
+          // Remove off-screen pipes
+          for (let i = pipes.length - 1; i >= 0; i--) {
+            if (pipes[i].x + pipes[i].width < 0) {
+              pipes.splice(i, 1);
+            }
+          }
+          // Possibly spawn new pipes
+          let rightmost = pipes.length > 0 ? pipes[0].x : CONFIG.designWidth * 0.75;
+          for (let i = 1; i < pipes.length; i++) {
+            if (pipes[i].x > rightmost) {
+              rightmost = pipes[i].x;
+            }
+          }
+          if (rightmost < CONFIG.designWidth) {
+            spawnPipeSet(rightmost + CONFIG.pipe.spacing);
+          }
+
+          // Move ground
+          for (let i = 0; i < groundSegments.length; i++) {
+            groundSegments[i].x -= CONFIG.speeds.scrollSpeed;
+          }
+          for (let i = groundSegments.length - 1; i >= 0; i--) {
+            if (groundSegments[i].x + groundSegments[i].width < 0) {
+              groundSegments.splice(i, 1);
+            }
+          }
+          // Possibly add ground
+          let groundImgWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
+          let rightmostX = 0;
+          if (groundSegments.length > 0) {
+            rightmostX = groundSegments[0].x + groundSegments[0].width;
+            for (let i = 1; i < groundSegments.length; i++) {
+              let segRight = groundSegments[i].x + groundSegments[i].width;
+              if (segRight > rightmostX) rightmostX = segRight;
+            }
+          }
+          if (rightmostX < CONFIG.designWidth + groundImgWidth) {
+            groundSegments.push({
+              x: rightmostX - CONFIG.ground.overlap,
+              y: groundY,
+              width: groundImgWidth
+            });
+          }
+
+          // Move vita sprites
+          for (let i = 0; i < vitaSprites.length; i++) {
+            vitaSprites[i].x -= CONFIG.speeds.scrollSpeed;
+          }
+          for (let i = vitaSprites.length - 1; i >= 0; i--) {
+            if (vitaSprites[i].x + vitaSprites[i].width < 0) {
+              vitaSprites.splice(i, 1);
+            }
+          }
+          // Fade in/out
+          for (let i = 0; i < vitaSprites.length; i++) {
+            let v = vitaSprites[i];
+            const dx = (v.x + v.width / 2) - bird.x;
+            if (dx <= CONFIG.vita.fadeDistance && bird.alive) {
+              v.opacity = Math.min(1, v.opacity + CONFIG.vita.fadeInSpeed);
+            } else {
+              v.opacity = Math.max(0, v.opacity - CONFIG.vita.fadeOutSpeed);
+            }
+          }
+
+          checkCollisions();
+        } else if (gameState === "gameover") {
+          if (!bird.grounded) updateBird();
+          for (let i = 0; i < vitaSprites.length; i++) {
+            vitaSprites[i].opacity = Math.max(0, vitaSprites[i].opacity - CONFIG.vita.fadeOutSpeed);
           }
         }
-        // Fade in/out
-        for (let i = 0; i < vitaSprites.length; i++) {
-          let v = vitaSprites[i];
-          const dx = v.x + v.width / 2 - bird.x;
-          if (dx <= CONFIG.vita.fadeDistance && bird.alive) {
-            v.opacity = Math.min(1, v.opacity + CONFIG.vita.fadeInSpeed);
-          } else {
-            v.opacity = Math.max(0, v.opacity - CONFIG.vita.fadeOutSpeed);
+        // Decrease flashAlpha
+        if (flashAlpha > 0) {
+          flashAlpha = Math.max(0, flashAlpha - CONFIG.flash.speed);
+        }
+      }
+
+      function updateBird() {
+        if (!bird.alive) {
+          bird.vel += CONFIG.physics.gravity;
+          if (bird.vel > CONFIG.physics.maxFallSpeed) bird.vel = CONFIG.physics.maxFallSpeed;
+          bird.y += bird.vel;
+          const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
+          const visualOffset = (bird.height - hitboxHeight) / 2;
+          if (bird.y + bird.height - visualOffset >= groundY) {
+            bird.y = groundY - bird.height + visualOffset;
+            bird.grounded = true;
           }
+          return;
         }
-
-        checkCollisions();
-      }
-      else if (gameState === "gameover") {
-        // Bird keeps falling until grounded
-        if (!bird.grounded) updateBird();
-        // Fade out vita
-        for (let i = 0; i < vitaSprites.length; i++) {
-          vitaSprites[i].opacity = Math.max(0, vitaSprites[i].opacity - CONFIG.vita.fadeOutSpeed);
-        }
-      }
-
-      // Decrease flashAlpha
-      if (flashAlpha > 0) {
-        flashAlpha = Math.max(0, flashAlpha - CONFIG.flash.speed);
-      }
-    }
-
-    function updateBird() {
-      if (!bird.alive) {
         bird.vel += CONFIG.physics.gravity;
-        if (bird.vel > CONFIG.physics.maxFallSpeed) {
-          bird.vel = CONFIG.physics.maxFallSpeed;
-        }
+        if (bird.vel > CONFIG.physics.maxFallSpeed) bird.vel = CONFIG.physics.maxFallSpeed;
         bird.y += bird.vel;
-        const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
-        const visualOffset = (bird.height - hitboxHeight) / 2;
+        const hitboxH = bird.height * CONFIG.hitboxes.bird.scale;
+        const visualOffset = (bird.height - hitboxH) / 2;
         if (bird.y + bird.height - visualOffset >= groundY) {
           bird.y = groundY - bird.height + visualOffset;
           bird.grounded = true;
-        }
-        return;
-      }
-      // Bird is alive
-      bird.vel += CONFIG.physics.gravity;
-      if (bird.vel > CONFIG.physics.maxFallSpeed) {
-        bird.vel = CONFIG.physics.maxFallSpeed;
-      }
-      bird.y += bird.vel;
-      const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
-      const visualOffset = (bird.height - hitboxHeight) / 2;
-      if (bird.y + bird.height - visualOffset >= groundY) {
-        bird.y = groundY - bird.height + visualOffset;
-        bird.grounded = true;
-        bird.alive = false;
-        flashAlpha = CONFIG.flash.maxAlpha;
-        endGame();
-      }
-    }
-
-    function checkCollisions() {
-      const hitboxWidth = bird.width * CONFIG.hitboxes.bird.scale;
-      const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
-      const hitboxX = bird.x + (bird.width - hitboxWidth) / 2;
-      const hitboxY = bird.y + (bird.height - hitboxHeight) / 2;
-      const birdHitbox = { x: hitboxX, y: hitboxY, width: hitboxWidth, height: hitboxHeight };
-
-      for (let i = 0; i < pipes.length; i++) {
-        let pipe = pipes[i];
-        // AABB collision
-        if (!(
-          birdHitbox.x + birdHitbox.width < pipe.x ||
-          birdHitbox.x > pipe.x + pipe.width ||
-          birdHitbox.y + birdHitbox.height < pipe.y ||
-          birdHitbox.y > pipe.y + pipe.height
-        )) {
-          // Collided
-          if (bird.alive) {
-            bird.alive = false;
-            flashAlpha = CONFIG.flash.maxAlpha;
-            endGame();
-          }
-          return;
-        }
-        // Scoring
-        if (!pipe.passed && pipe.type === "bottom") {
-          if (bird.x > pipe.x) {
-            pipe.passed = true;
-            score++;
-          }
+          bird.alive = false;
+          flashAlpha = CONFIG.flash.maxAlpha;
+          endGame();
         }
       }
 
-      // Ground collision
-      if (birdHitbox.y + birdHitbox.height >= groundY) {
-        const visualOffset = (bird.height - hitboxHeight) / 2;
-        bird.y = groundY - bird.height + visualOffset;
-        bird.grounded = true;
-        bird.alive = false;
-        flashAlpha = CONFIG.flash.maxAlpha;
-        endGame();
-      }
-    }
-
-    function endGame() {
-      gameState = "gameover";
-      gameOverTimer = Date.now();
-    }
-
-    //==================================================
-    // DRAWING
-    //==================================================
-    function draw() {
-      // We don’t scale the canvas context; it’s fixed at 414×736 internally
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, worldWidth, worldHeight);
-
-      // Simple sky + ground fill
-      ctx.fillStyle = "rgb(110,190,201)";
-      ctx.fillRect(0, 0, worldWidth, groundY);
-      ctx.fillStyle = "rgb(221,216,157)";
-      ctx.fillRect(0, groundY, worldWidth, worldHeight - groundY);
-
-      // Background skyline
-      if (ASSETS["skyline"]) {
-        let sw = ASSETS["skyline"].width;
-        let sh = ASSETS["skyline"].height;
-        let numTiles = Math.ceil(worldWidth / sw) + 2;
-        for (let i = 0; i < numTiles; i++) {
-          let xPos = i * sw + bgScroll;
-          if (xPos < worldWidth && xPos > -sw) {
-            ctx.drawImage(ASSETS["skyline"], xPos, groundY - sh);
-          }
-        }
-      }
-
-      // Pipes
-      for (let i = 0; i < pipes.length; i++) {
-        let pipe = pipes[i];
-        let img = (pipe.type === "top") ? ASSETS["pipe_top"] : ASSETS["pipe_bottom"];
-        if (img) {
-          ctx.drawImage(img, pipe.x, pipe.y);
-        } else {
-          ctx.fillStyle = "green";
-          ctx.fillRect(pipe.x, pipe.y, pipe.width, pipe.height);
-        }
-      }
-
-      // Ground
-      if (ASSETS["ground"]) {
-        for (let i = 0; i < groundSegments.length; i++) {
-          let seg = groundSegments[i];
-          ctx.drawImage(ASSETS["ground"], seg.x, seg.y);
-        }
-      } else {
-        for (let i = 0; i < groundSegments.length; i++) {
-          let seg = groundSegments[i];
-          ctx.fillStyle = "rgb(221,216,157)";
-          ctx.fillRect(seg.x, seg.y, seg.width, worldHeight - seg.y);
-        }
-      }
-
-      // Vita sprites
-      for (let i = 0; i < vitaSprites.length; i++) {
-        let v = vitaSprites[i];
-        if (v.img && v.opacity > 0) {
-          ctx.save();
-          ctx.globalAlpha = v.opacity;
-          ctx.drawImage(v.img, v.x, v.y, v.width, v.height);
-          ctx.restore();
-        }
-      }
-
-      // Bird
-      drawBird();
-
-      // Score (no strokeText—only fillText)
-      ctx.fillStyle = "#ffffff";
-      ctx.font = CONFIG.scoreFont; // e.g. "78px monospace"
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.save();
-      ctx.translate(worldWidth * CONFIG.scorePosition.x, CONFIG.scorePosition.y);
-      ctx.scale(1, 1.5);
-      ctx.fillText(score.toString(), 0, 0);
-      ctx.restore();
-
-      // Flash overlay
-      if (flashAlpha > 0) {
-        ctx.fillStyle = `rgba(255,255,255,${flashAlpha / 255})`;
-        ctx.fillRect(0, 0, worldWidth, worldHeight);
-      }
-
-      // Menu / Game Over
-      if (gameState === "menu") {
-        drawMenu();
-      } else if (gameState === "gameover") {
-        drawGameOver();
-      }
-
-      // Pause button
-      if (gameState === "play" && !gamePaused) {
-        const buttonSize = CONFIG.ui.pause.buttonSize;
-        const margin = CONFIG.ui.pause.margin;
-        if (ASSETS["pause"]) {
-          ctx.drawImage(ASSETS["pause"], margin, margin, buttonSize, buttonSize);
-        }
-      }
-
-      // Pause overlay
-      if (gamePaused && ASSETS["pause_2"]) {
-        let img = ASSETS["pause_2"];
-        let maxWidth = worldWidth * CONFIG.ui.maxWidthPercent;
-        let scaleVal = Math.min(
-          CONFIG.ui.pause.popupScale,
-          maxWidth / img.width,
-          (worldHeight * 0.8) / img.height
-        );
-        let scaledWidth = img.width * scaleVal;
-        let scaledHeight = img.height * scaleVal;
-        pauseUI.width = scaledWidth;
-        pauseUI.height = scaledHeight;
-        pauseUI.x = (worldWidth - scaledWidth) / 2;
-        pauseUI.y = (worldHeight - scaledHeight) / 2;
-        pauseUI.rowHeight = scaledHeight / 3;
-
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0, 0, worldWidth, worldHeight);
-        ctx.drawImage(img, pauseUI.x, pauseUI.y, scaledWidth, scaledHeight);
-      }
-
-      // Debug hitboxes if needed
-      if (CONFIG.hitboxes.enabled) {
-        const hitboxWidth = bird.width * CONFIG.hitboxes.bird.scale;
-        const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
-        const hitboxX = bird.x + (bird.width - hitboxWidth) / 2;
-        const hitboxY = bird.y + (bird.height - hitboxHeight) / 2;
-        ctx.strokeStyle = CONFIG.hitboxes.bird.color;
-        ctx.lineWidth = CONFIG.hitboxes.bird.lineWidth;
-        ctx.strokeRect(hitboxX, hitboxY, hitboxWidth, hitboxHeight);
+      function checkCollisions() {
+        const hitboxW = bird.width * CONFIG.hitboxes.bird.scale;
+        const hitboxH = bird.height * CONFIG.hitboxes.bird.scale;
+        const hitboxX = bird.x + (bird.width - hitboxW) / 2;
+        const hitboxY = bird.y + (bird.height - hitboxH) / 2;
+        const birdHitbox = { x: hitboxX, y: hitboxY, width: hitboxW, height: hitboxH };
 
         for (let i = 0; i < pipes.length; i++) {
           let pipe = pipes[i];
-          ctx.strokeStyle = CONFIG.hitboxes.pipe.color;
-          ctx.lineWidth = CONFIG.hitboxes.pipe.lineWidth;
-          ctx.strokeRect(pipe.x, pipe.y, pipe.width, pipe.height);
+          if (!(birdHitbox.x + birdHitbox.width < pipe.x ||
+                birdHitbox.x > pipe.x + pipe.width ||
+                birdHitbox.y + birdHitbox.height < pipe.y ||
+                birdHitbox.y > pipe.y + pipe.height)) {
+            if (bird.alive) {
+              bird.alive = false;
+              flashAlpha = CONFIG.flash.maxAlpha;
+              endGame();
+            }
+            return;
+          }
+          // scoring
+          if (!pipe.passed && pipe.type === "bottom") {
+            if (bird.x > pipe.x) {
+              pipe.passed = true;
+              score++;
+            }
+          }
         }
-        ctx.strokeStyle = CONFIG.hitboxes.floor.color;
-        ctx.lineWidth = CONFIG.hitboxes.floor.lineWidth;
-        ctx.beginPath();
-        ctx.moveTo(0, groundY);
-        ctx.lineTo(worldWidth, groundY);
-        ctx.stroke();
+        // ground collision
+        if (birdHitbox.y + birdHitbox.height >= groundY) {
+          const visualOffset = (bird.height - hitboxH) / 2;
+          bird.y = groundY - bird.height + visualOffset;
+          bird.grounded = true;
+          bird.alive = false;
+          flashAlpha = CONFIG.flash.maxAlpha;
+          endGame();
+        }
       }
-    }
 
-    function drawBird() {
-      let frame = birdFrames[0];
-      if (!frame) return;
+      function endGame() {
+        gameState = "gameover";
+        gameOverTimer = Date.now();
+      }
 
-      if (isFlapping) {
-        const elapsed = Date.now() - flapStartTime;
-        if (elapsed >= CONFIG.bird.flapDuration) {
-          isFlapping = false;
+      //==================================================
+      // DRAW
+      //==================================================
+      function draw() {
+        // Scale all drawing to our letterboxed canvas
+        ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
+        ctx.clearRect(0, 0, worldWidth, CONFIG.designHeight);
+
+        // Background
+        ctx.fillStyle = "rgb(110,190,201)";
+        ctx.fillRect(0, 0, worldWidth, groundY);
+        ctx.fillStyle = "rgb(221,216,157)";
+        ctx.fillRect(0, groundY, worldWidth, CONFIG.designHeight - groundY);
+
+        // Skyline
+        if (ASSETS["skyline"]) {
+          let sw = ASSETS["skyline"].width;
+          let sh = ASSETS["skyline"].height;
+          let numTiles = Math.ceil(worldWidth / sw) + 2;
+          for (let i = 0; i < numTiles; i++) {
+            let xPos = i * sw + bgScroll;
+            if (xPos < worldWidth && xPos > -sw) {
+              ctx.drawImage(ASSETS["skyline"], xPos, groundY - sh);
+            }
+          }
+        }
+
+        // Pipes
+        for (let i = 0; i < pipes.length; i++) {
+          let pipe = pipes[i];
+          let img = pipe.type === "top" ? ASSETS["pipe_top"] : ASSETS["pipe_bottom"];
+          if (img) {
+            ctx.drawImage(img, pipe.x, pipe.y);
+          } else {
+            ctx.fillStyle = "green";
+            ctx.fillRect(pipe.x, pipe.y, pipe.width, pipe.height);
+          }
+        }
+
+        // Ground
+        if (ASSETS["ground"]) {
+          for (let i = 0; i < groundSegments.length; i++) {
+            let seg = groundSegments[i];
+            ctx.drawImage(ASSETS["ground"], seg.x, seg.y);
+          }
         } else {
-          let frameIndex = Math.floor(elapsed / CONFIG.bird.flapFrameTime) % birdFrames.length;
-          frame = birdFrames[frameIndex];
+          // fallback
+          for (let i = 0; i < groundSegments.length; i++) {
+            let seg = groundSegments[i];
+            ctx.fillStyle = "rgb(221,216,157)";
+            ctx.fillRect(seg.x, seg.y, seg.width, CONFIG.designHeight - seg.y);
+          }
+        }
+
+        // Vita sprites
+        for (let i = 0; i < vitaSprites.length; i++) {
+          let v = vitaSprites[i];
+          if (v.img && v.opacity > 0) {
+            ctx.save();
+            ctx.globalAlpha = v.opacity;
+            ctx.drawImage(v.img, v.x, v.y, v.width, v.height);
+            ctx.restore();
+          }
+        }
+
+        // Bird
+        drawBird();
+
+        // Draw score with black outline
+        ctx.save();
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 6; // Adjust thickness as you like
+        ctx.font = CONFIG.scoreFont; // e.g. "60px '8-bit Arcade In'"
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        ctx.translate(worldWidth * CONFIG.scorePosition.x, CONFIG.scorePosition.y);
+        // slight vertical stretch if you want (like original):
+        ctx.scale(1, 1.5);
+
+        const scoreStr = score.toString();
+        ctx.strokeText(scoreStr, 0, 0);
+        ctx.fillText(scoreStr, 0, 0);
+        ctx.restore();
+
+        // Flash overlay
+        if (flashAlpha > 0) {
+          ctx.fillStyle = `rgba(255,255,255,${flashAlpha / 255})`;
+          ctx.fillRect(0, 0, worldWidth, CONFIG.designHeight);
+        }
+
+        // Menu / Game Over
+        if (gameState === "menu") {
+          drawMenu();
+        } else if (gameState === "gameover") {
+          drawGameOver();
+        }
+
+        // Pause button
+        if (gameState === "play" && !gamePaused) {
+          const buttonSize = CONFIG.ui.pause.buttonSize;
+          const margin = CONFIG.ui.pause.margin;
+          if (ASSETS["pause"]) {
+            ctx.drawImage(ASSETS["pause"], margin, margin, buttonSize, buttonSize);
+          }
+        }
+
+        // Pause overlay
+        if (gamePaused && ASSETS["pause_2"]) {
+          let img = ASSETS["pause_2"];
+          let maxWidth = worldWidth * CONFIG.ui.maxWidthPercent;
+          let scaleVal = Math.min(
+            CONFIG.ui.pause.popupScale,
+            maxWidth / img.width,
+            (CONFIG.designHeight * 0.8) / img.height
+          );
+          let scaledWidth = img.width * scaleVal;
+          let scaledHeight = img.height * scaleVal;
+          pauseUI.width = scaledWidth;
+          pauseUI.height = scaledHeight;
+          pauseUI.x = (worldWidth - scaledWidth) / 2;
+          pauseUI.y = (CONFIG.designHeight - scaledHeight) / 2;
+          pauseUI.rowHeight = scaledHeight / 3;
+
+          ctx.fillStyle = "rgba(0,0,0,0.5)";
+          ctx.fillRect(0, 0, worldWidth, CONFIG.designHeight);
+          ctx.drawImage(img, pauseUI.x, pauseUI.y, scaledWidth, scaledHeight);
+        }
+
+        // Debug hitboxes if needed
+        if (CONFIG.hitboxes.enabled) {
+          const hitboxW = bird.width * CONFIG.hitboxes.bird.scale;
+          const hitboxH = bird.height * CONFIG.hitboxes.bird.scale;
+          const hitboxX = bird.x + (bird.width - hitboxW) / 2;
+          const hitboxY = bird.y + (bird.height - hitboxH) / 2;
+          ctx.strokeStyle = CONFIG.hitboxes.bird.color;
+          ctx.lineWidth = CONFIG.hitboxes.bird.lineWidth;
+          ctx.strokeRect(hitboxX, hitboxY, hitboxW, hitboxH);
+
+          for (let i = 0; i < pipes.length; i++) {
+            let pipe = pipes[i];
+            ctx.strokeStyle = CONFIG.hitboxes.pipe.color;
+            ctx.lineWidth = CONFIG.hitboxes.pipe.lineWidth;
+            ctx.strokeRect(pipe.x, pipe.y, pipe.width, pipe.height);
+          }
+
+          ctx.strokeStyle = CONFIG.hitboxes.floor.color;
+          ctx.lineWidth = CONFIG.hitboxes.floor.lineWidth;
+          ctx.beginPath();
+          ctx.moveTo(0, groundY);
+          ctx.lineTo(worldWidth, groundY);
+          ctx.stroke();
         }
       }
 
-      let angle = 0;
-      if (!bird.alive) {
-        angle = CONFIG.bird.rotationDown;
-      } else if (bird.vel < 0) {
-        angle = CONFIG.bird.rotationUp;
+      function drawBird() {
+        let frame = birdFrames[0];
+        if (!frame) return;
+
+        if (isFlapping) {
+          const elapsed = Date.now() - flapStartTime;
+          if (elapsed >= CONFIG.bird.flapDuration) {
+            isFlapping = false;
+          } else {
+            let frameIndex = Math.floor(elapsed / CONFIG.bird.flapFrameTime) % birdFrames.length;
+            frame = birdFrames[frameIndex];
+          }
+        }
+
+        let angle = 0;
+        if (!bird.alive) {
+          angle = CONFIG.bird.rotationDown;
+        } else if (bird.vel < 0) {
+          angle = CONFIG.bird.rotationUp;
+        }
+        ctx.save();
+        ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
+        ctx.rotate((angle * Math.PI) / 180);
+        ctx.drawImage(frame, -bird.width / 2, -bird.height / 2, bird.width, bird.height);
+        ctx.restore();
       }
 
-      ctx.save();
-      ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
-      ctx.rotate((angle * Math.PI) / 180);
-      ctx.drawImage(frame, -bird.width / 2, -bird.height / 2, bird.width, bird.height);
-      ctx.restore();
-    }
-
-    function drawMenu() {
-      if (ASSETS["start"]) {
-        let img = ASSETS["start"];
-        let maxWidth = worldWidth * CONFIG.ui.maxWidthPercent;
-        let scaleVal = Math.min(
-          CONFIG.ui.scale,
-          maxWidth / img.width,
-          (worldHeight * 0.4) / img.height
-        );
-        let scaledWidth = img.width * scaleVal;
-        let scaledHeight = img.height * scaleVal;
-        let x = (worldWidth - scaledWidth) / 2;
-        let y = Math.max(CONFIG.ui.minMargin, worldHeight * 0.2 - (scaledHeight / 2));
-        ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+      function drawMenu() {
+        if (ASSETS["start"]) {
+          let img = ASSETS["start"];
+          let maxWidth = worldWidth * CONFIG.ui.maxWidthPercent;
+          let scaleVal = Math.min(
+            CONFIG.ui.scale,
+            maxWidth / img.width,
+            (CONFIG.designHeight * 0.4) / img.height
+          );
+          let scaledWidth = img.width * scaleVal;
+          let scaledHeight = img.height * scaleVal;
+          let x = (worldWidth - scaledWidth) / 2;
+          let y = Math.max(CONFIG.ui.minMargin, CONFIG.designHeight * 0.2 - scaledHeight / 2);
+          ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+        }
+        if (ASSETS["tutorial"]) {
+          let img = ASSETS["tutorial"];
+          let x = bird.x + bird.width;
+          let y = bird.y - img.height / 4;
+          ctx.drawImage(img, x, y, 105, 135);
+        }
       }
-      if (ASSETS["tutorial"]) {
-        let img = ASSETS["tutorial"];
-        let x = bird.x + bird.width;
-        let y = bird.y - (img.height / 4);
-        ctx.drawImage(img, x, y, 105, 135);
+
+      function drawGameOver() {
+        if (ASSETS["game_over"]) {
+          let img = ASSETS["game_over"];
+          let maxWidth = worldWidth * CONFIG.ui.maxWidthPercent;
+          let scaleVal = Math.min(
+            CONFIG.ui.gameOver.scale,
+            maxWidth / img.width,
+            (CONFIG.designHeight * 0.8) / img.height
+          );
+          let scaledWidth = img.width * scaleVal;
+          let scaledHeight = img.height * scaleVal;
+          gameOverUI.width = scaledWidth;
+          gameOverUI.height = scaledHeight;
+          gameOverUI.x = (worldWidth - scaledWidth) / 2;
+          gameOverUI.y = (CONFIG.designHeight - scaledHeight) / 2;
+          gameOverUI.cellWidth = scaledWidth / CONFIG.ui.gameOver.grid.cols;
+          gameOverUI.cellHeight = scaledHeight / CONFIG.ui.gameOver.grid.rows;
+          ctx.drawImage(img, gameOverUI.x, gameOverUI.y, scaledWidth, scaledHeight);
+        }
       }
-    }
 
-    function drawGameOver() {
-      if (ASSETS["game_over"]) {
-        let img = ASSETS["game_over"];
-        let maxWidth = worldWidth * CONFIG.ui.maxWidthPercent;
-        let scaleVal = Math.min(
-          CONFIG.ui.gameOver.scale,
-          maxWidth / img.width,
-          (worldHeight * 0.8) / img.height
-        );
-        let scaledWidth = img.width * scaleVal;
-        let scaledHeight = img.height * scaleVal;
-        gameOverUI.width = scaledWidth;
-        gameOverUI.height = scaledHeight;
-        gameOverUI.x = (worldWidth - scaledWidth) / 2;
-        gameOverUI.y = (worldHeight - scaledHeight) / 2;
-        gameOverUI.cellWidth = scaledWidth / CONFIG.ui.gameOver.grid.cols;
-        gameOverUI.cellHeight = scaledHeight / CONFIG.ui.gameOver.grid.rows;
-        ctx.drawImage(img, gameOverUI.x, gameOverUI.y, scaledWidth, scaledHeight);
-      }
-    }
+      //==================================================
+      // INPUT HANDLERS
+      //==================================================
+      window.addEventListener("mousedown", handleInput);
+      window.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        handleInput(e.touches[0]);
+      });
 
-    //==================================================
-    // INPUT HANDLING
-    //==================================================
-    window.addEventListener("mousedown", handleInput);
-    window.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      handleInput(e.touches[0]);
-    });
+      function handleInput(e) {
+        let rect = canvas.getBoundingClientRect();
+        // Convert from screen coords to game coords
+        let clickX = (e.clientX - rect.left) / scaleFactor;
+        let clickY = (e.clientY - rect.top) / scaleFactor;
 
-    function handleInput(e) {
-      let rect = canvas.getBoundingClientRect();
-      // Because we aren't scaling with JS, just offset by canvas coords
-      let clickX = e.clientX - rect.left;
-      let clickY = e.clientY - rect.top;
-
-      if (gameState !== "gameover" && !gamePaused) {
-        // Check pause button
-        const buttonSize = CONFIG.ui.pause.buttonSize;
-        const margin = CONFIG.ui.pause.margin;
-        if (
-          clickX >= margin &&
-          clickX <= margin + buttonSize &&
-          clickY >= margin &&
-          clickY <= margin + buttonSize
-        ) {
-          gamePaused = true;
+        if (gameState !== "gameover" && !gamePaused) {
+          // Pause button
+          const buttonSize = CONFIG.ui.pause.buttonSize;
+          const margin = CONFIG.ui.pause.margin;
+          if (
+            clickX >= margin &&
+            clickX <= margin + buttonSize &&
+            clickY >= margin &&
+            clickY <= margin + buttonSize
+          ) {
+            gamePaused = true;
+            return;
+          }
+        }
+        if (gamePaused) {
+          handlePauseClick(clickX, clickY);
           return;
         }
-      }
-      if (gamePaused) {
-        handlePauseClick(clickX, clickY);
-        return;
-      }
-      if (gameState === "gameover") {
-        handleGameOverClick(clickX, clickY);
-      } else {
-        handleJump();
-      }
-    }
-
-    function handlePauseClick(clickX, clickY) {
-      if (
-        clickX >= pauseUI.x &&
-        clickX <= pauseUI.x + pauseUI.width &&
-        clickY >= pauseUI.y &&
-        clickY <= pauseUI.y + pauseUI.height
-      ) {
-        let relativeY = clickY - pauseUI.y;
-        let rowIndex = Math.floor(relativeY / pauseUI.rowHeight);
-        switch (rowIndex) {
-          case 0:
-            // Resume
-            gamePaused = false;
-            break;
-          case 1:
-            // "About" link
-            window.location.href = 'https://brunobrissa.com/about';
-            break;
-          case 2:
-            // Home link
-            window.location.href = 'https://brunobrissa.com';
-            break;
+        if (gameState === "gameover") {
+          handleGameOverClick(clickX, clickY);
+        } else {
+          handleJump();
         }
       }
-    }
 
-    function handleGameOverClick(clickX, clickY) {
-      if (Date.now() - gameOverTimer < CONFIG.ui.gameOver.cooldownPeriod) return;
-      if (
-        clickX >= gameOverUI.x &&
-        clickX <= gameOverUI.x + gameOverUI.width &&
-        clickY >= gameOverUI.y &&
-        clickY <= gameOverUI.y + gameOverUI.height
-      ) {
-        let relativeX = clickX - gameOverUI.x;
-        let relativeY = clickY - gameOverUI.y;
-        let colIndex = Math.floor(relativeX / gameOverUI.cellWidth);
-        let rowIndex = Math.floor(relativeY / gameOverUI.cellHeight);
+      function handlePauseClick(cx, cy) {
         if (
-          colIndex >= CONFIG.ui.gameOver.grid.activeMinCol &&
-          colIndex <= CONFIG.ui.gameOver.grid.activeMaxCol &&
-          rowIndex >= CONFIG.ui.gameOver.grid.activeMinRow &&
-          rowIndex <= CONFIG.ui.gameOver.grid.activeMaxRow
+          cx >= pauseUI.x &&
+          cx <= pauseUI.x + pauseUI.width &&
+          cy >= pauseUI.y &&
+          cy <= pauseUI.y + pauseUI.height
         ) {
+          let relativeY = cy - pauseUI.y;
+          let rowIndex = Math.floor(relativeY / pauseUI.rowHeight);
           switch (rowIndex) {
+            case 0:
+              gamePaused = false;
+              break;
             case 1:
-              resetGame();
+              window.location.href = "https://brunobrissa.com/about";
               break;
             case 2:
-              window.location.href = 'https://brunobrissa.com/about';
-              break;
-            case 3:
-              window.location.href = 'https://brunobrissa.com';
+              window.location.href = "https://brunobrissa.com";
               break;
           }
         }
       }
-    }
 
-    function handleJump() {
-      if (gameState === "menu") {
-        gameState = "play";
-        bird.vel = CONFIG.physics.flapForce;
-        startFlapAnimation();
-      } else if (gameState === "play" && bird.alive && !bird.grounded) {
-        bird.vel = CONFIG.physics.flapForce;
-        startFlapAnimation();
-      }
-    }
+      function handleGameOverClick(cx, cy) {
+        if (Date.now() - gameOverTimer < CONFIG.ui.gameOver.cooldownPeriod) return;
+        if (
+          cx >= gameOverUI.x &&
+          cx <= gameOverUI.x + gameOverUI.width &&
+          cy >= gameOverUI.y &&
+          cy <= gameOverUI.y + gameOverUI.height
+        ) {
+          let relativeX = cx - gameOverUI.x;
+          let relativeY = cy - gameOverUI.y;
+          let colIndex = Math.floor(relativeX / gameOverUI.cellWidth);
+          let rowIndex = Math.floor(relativeY / gameOverUI.cellHeight);
 
-    function startFlapAnimation() {
-      flapStartTime = Date.now();
-      isFlapping = true;
-    }
-
-    function spawnPipeSet(xPos) {
-      const pipeHeight = ASSETS["pipe_top"]?.height || CONFIG.pipe.defaultHeight;
-      const minCenter = CONFIG.pipe.minEdgeDistance + (CONFIG.pipe.gap / 2);
-      const maxCenter = groundY - CONFIG.pipe.minEdgeDistance - (CONFIG.pipe.gap / 2);
-      let gapCenter = Math.floor(Math.random() * (maxCenter - minCenter)) + minCenter;
-
-      let topY = gapCenter - (CONFIG.pipe.gap / 2) - pipeHeight;
-      let bottomY = gapCenter + (CONFIG.pipe.gap / 2);
-      let topPipe = {
-        x: xPos,
-        y: topY,
-        width: ASSETS["pipe_top"]?.width || CONFIG.pipe.defaultWidth,
-        height: pipeHeight,
-        type: "top",
-        passed: false
-      };
-      let bottomPipe = {
-        x: xPos,
-        y: bottomY,
-        width: ASSETS["pipe_bottom"]?.width || CONFIG.pipe.defaultWidth,
-        height: pipeHeight,
-        type: "bottom",
-        passed: false
-      };
-      pipes.push(topPipe, bottomPipe);
-
-      if (vitaCounter < CONFIG.vita.max) {
-        let vitaName = `vita_${vitaCounter + 1}`;
-        let vitaImg = ASSETS[vitaName];
-        if (vitaImg) {
-          let pipeWidth = topPipe.width;
-          let nextPipeX = xPos + CONFIG.pipe.spacing;
-          let midpointX = xPos + pipeWidth + (nextPipeX - (xPos + pipeWidth)) / 2;
-          let vitaWidth = vitaImg.width * CONFIG.vita.scale;
-          vitaSprites.push({
-            x: midpointX - vitaWidth / 2,
-            y: 55,
-            width: vitaWidth,
-            height: vitaImg.height * CONFIG.vita.scale,
-            img: vitaImg,
-            opacity: 0
-          });
+          if (
+            colIndex >= CONFIG.ui.gameOver.grid.activeMinCol &&
+            colIndex <= CONFIG.ui.gameOver.grid.activeMaxCol &&
+            rowIndex >= CONFIG.ui.gameOver.grid.activeMinRow &&
+            rowIndex <= CONFIG.ui.gameOver.grid.activeMaxRow
+          ) {
+            switch (rowIndex) {
+              case 1:
+                resetGame();
+                break;
+              case 2:
+                window.location.href = "https://brunobrissa.com/about";
+                break;
+              case 3:
+                window.location.href = "https://brunobrissa.com";
+                break;
+            }
+          }
         }
-        vitaCounter++;
       }
-    }
 
-    //==================================================
-    // START IT ALL
-    //==================================================
-    loadAllImages(imageList, () => {
-      init();
-    });
-
-    document.addEventListener("visibilitychange", function() {
-      if (document.hidden) {
-        gamePaused = true;
-      } else if (gameState !== "gameover") {
-        gamePaused = false;
-        lastTime = performance.now();
+      function handleJump() {
+        if (gameState === "menu") {
+          gameState = "play";
+          bird.vel = CONFIG.physics.flapForce;
+          startFlapAnimation();
+        } else if (gameState === "play" && bird.alive && !bird.grounded) {
+          bird.vel = CONFIG.physics.flapForce;
+          startFlapAnimation();
+        }
       }
-    });
-  </script>
-</body>
+
+      function startFlapAnimation() {
+        flapStartTime = Date.now();
+        isFlapping = true;
+      }
+
+      function spawnPipeSet(xPos) {
+        const pipeHeight = ASSETS["pipe_top"]?.height || CONFIG.pipe.defaultHeight;
+        const minCenter = CONFIG.pipe.minEdgeDistance + (CONFIG.pipe.gap / 2);
+        const maxCenter = groundY - CONFIG.pipe.minEdgeDistance - (CONFIG.pipe.gap / 2);
+        let gapCenter = Math.floor(Math.random() * (maxCenter - minCenter)) + minCenter;
+
+        let topY = gapCenter - CONFIG.pipe.gap / 2 - pipeHeight;
+        let bottomY = gapCenter + CONFIG.pipe.gap / 2;
+
+        let topPipe = {
+          x: xPos,
+          y: topY,
+          width: ASSETS["pipe_top"]?.width || CONFIG.pipe.defaultWidth,
+          height: pipeHeight,
+          type: "top",
+          passed: false
+        };
+        let bottomPipe = {
+          x: xPos,
+          y: bottomY,
+          width: ASSETS["pipe_bottom"]?.width || CONFIG.pipe.defaultWidth,
+          height: pipeHeight,
+          type: "bottom",
+          passed: false
+        };
+        pipes.push(topPipe, bottomPipe);
+
+        // spawn vita
+        if (vitaCounter < CONFIG.vita.max) {
+          let vitaName = `vita_${vitaCounter + 1}`;
+          let vitaImg = ASSETS[vitaName];
+          if (vitaImg) {
+            let pipeWidth = topPipe.width;
+            let nextPipeX = xPos + CONFIG.pipe.spacing;
+            let midpointX = pipeWidth + (nextPipeX - (xPos + pipeWidth)) / 2 + xPos;
+            let vitaWidth = vitaImg.width * CONFIG.vita.scale;
+            vitaSprites.push({
+              x: midpointX - vitaWidth / 2,
+              y: 55,
+              width: vitaWidth,
+              height: vitaImg.height * CONFIG.vita.scale,
+              img: vitaImg,
+              opacity: 0
+            });
+          }
+          vitaCounter++;
+        }
+      }
+
+      //==================================================
+      // START
+      //==================================================
+      loadAllImages(imageList, () => {
+        init();
+      });
+
+      document.addEventListener("visibilitychange", function() {
+        if (document.hidden) {
+          gamePaused = true;
+        } else if (gameState !== "gameover") {
+          gamePaused = false;
+          lastTime = performance.now();
+        }
+      });
+    </script>
+  </body>
 </html>
