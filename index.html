@@ -143,7 +143,7 @@
       let performanceMultiplier = 1;
       const targetFrameTime = 16.7; // ~60 FPS target in ms
       const testFrameCount = 60;
-      const minMultiplier = 1;  // Do not slow down faster devices.
+      const minMultiplier = 1.2;  // Do not slow down faster devices.
       const maxMultiplier = 2;  // Do not amplify more than 2x.
       let frameTimes = [];
       let perfLastTime = 0;
@@ -163,7 +163,7 @@
           if (performanceMultiplier > maxMultiplier) performanceMultiplier = maxMultiplier;
           // Apply multiplier once and for all
           CONFIG.physics.gravity *= performanceMultiplier;
-          CONFIG.physics.flapForce *= performanceMultiplier;
+          CONFIG.physics.flapForce *= performanceMultiplier * 0.75;
           CONFIG.physics.maxFallSpeed *= performanceMultiplier;
           CONFIG.speeds.scrollSpeed *= performanceMultiplier;
           CONFIG.speeds.bgScrollSpeed *= performanceMultiplier;
