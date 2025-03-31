@@ -140,9 +140,9 @@
       const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
       if (isSafari) {
         // Increase physics and scrolling speeds for Safari only
-        CONFIG.physics.gravity *= 1.7;
-        CONFIG.physics.flapForce *= 1.3;
-        CONFIG.physics.maxFallSpeed *= 1.7;
+        CONFIG.physics.gravity *= 2;
+        CONFIG.physics.flapForce *= 1.7;
+        CONFIG.physics.maxFallSpeed *= 2;
         CONFIG.speeds.scrollSpeed *= 1.7;
         CONFIG.speeds.bgScrollSpeed *= 1.7;
       }
