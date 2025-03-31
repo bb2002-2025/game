@@ -17,7 +17,7 @@
         background: #000;
         overflow: hidden;
       }
-      /* Center canvas and add hardware acceleration hints */
+      /* Center canvas with hardware acceleration hints */
       #gameCanvas {
         display: block;
         margin: 0 auto;
@@ -29,11 +29,11 @@
     </style>
   </head>
   <body>
-    <!-- Design resolution is fixed at 414x736 -->
+    <!-- We use a design resolution (phone-like) of 414x736 -->
     <canvas id="gameCanvas" width="414" height="736"></canvas>
     <script>
       //==================================================
-      // CONFIGURATION
+      // CONFIGURATION: Tweak all key values here
       //==================================================
       const CONFIG = {
         designWidth: 414,
@@ -130,11 +130,11 @@
       //==================================================
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
-      // Disable image smoothing (and vendor-prefixed)
+      // Disable smoothing (with vendor prefix)
       ctx.imageSmoothingEnabled = false;
       ctx.webkitImageSmoothingEnabled = false;
 
-      // Calculate scaling based on the current full-screen dimensions
+      // Calculate world scaling based on full-screen dimensions:
       let scaleFactor = window.innerHeight / CONFIG.designHeight;
       let worldWidth = window.innerWidth / scaleFactor;
 
@@ -143,7 +143,6 @@
         canvas.height = window.innerHeight;
         scaleFactor = canvas.height / CONFIG.designHeight;
         worldWidth = canvas.width / scaleFactor;
-        // Reapply smoothing settings in case Safari resets them
         ctx.imageSmoothingEnabled = false;
         ctx.webkitImageSmoothingEnabled = false;
       }
@@ -235,7 +234,7 @@
       // INITIAL SETUP AFTER IMAGES LOADED
       //==================================================
       function init() {
-        resizeCanvas();
+        resizeCanvas(); // Set initial dimensions
         // Set up bird animation frames
         birdFrames = [
           ASSETS["head_normal"],
@@ -307,40 +306,27 @@
           bgScroll -= CONFIG.speeds.bgScrollSpeed;
           if (ASSETS["skyline"]) {
             let sw = ASSETS["skyline"].width;
-            if (bgScroll <= -sw) {
-              bgScroll = 0;
-            }
+            if (bgScroll <= -sw) bgScroll = 0;
           }
           updateBird();
           for (let i = 0; i < pipes.length; i++) {
             pipes[i].x -= CONFIG.speeds.scrollSpeed;
           }
-          // Use plain loop to find rightmost pipe
-          let rightmost = 0;
-          for (let i = 0; i < pipes.length; i++) {
-            if (pipes[i].x > rightmost) rightmost = pipes[i].x;
-          }
-          if (pipes.length === 0) rightmost = worldWidth * 0.75;
+          pipes = pipes.filter(p => p.x + p.width > 0);
+          let rightmost = (pipes.length > 0)
+            ? Math.max.apply(null, pipes.map(p => p.x))
+            : worldWidth * 0.75;
           if (rightmost < worldWidth) {
             spawnPipeSet(rightmost + CONFIG.pipe.spacing);
           }
           for (let i = 0; i < groundSegments.length; i++) {
             groundSegments[i].x -= CONFIG.speeds.scrollSpeed;
           }
-          // Filter ground segments
-          let newGround = [];
-          for (let i = 0; i < groundSegments.length; i++) {
-            if (groundSegments[i].x + groundSegments[i].width > 0) {
-              newGround.push(groundSegments[i]);
-            }
-          }
-          groundSegments = newGround;
+          groundSegments = groundSegments.filter(g => g.x + g.width > 0);
           let groundImgWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
-          let rightmostX = 0;
-          for (let i = 0; i < groundSegments.length; i++) {
-            let segRight = groundSegments[i].x + groundSegments[i].width;
-            if (segRight > rightmostX) rightmostX = segRight;
-          }
+          let rightmostX = (groundSegments.length > 0)
+            ? Math.max.apply(null, groundSegments.map(g => g.x + g.width))
+            : 0;
           if (rightmostX < worldWidth + groundImgWidth) {
             groundSegments.push({
               x: rightmostX - CONFIG.ground.overlap,
@@ -351,13 +337,7 @@
           for (let i = 0; i < vitaSprites.length; i++) {
             vitaSprites[i].x -= CONFIG.speeds.scrollSpeed;
           }
-          let newVita = [];
-          for (let i = 0; i < vitaSprites.length; i++) {
-            if (vitaSprites[i].x + vitaSprites[i].width > 0) {
-              newVita.push(vitaSprites[i]);
-            }
-          }
-          vitaSprites = newVita;
+          vitaSprites = vitaSprites.filter(v => v.x + v.width > 0);
           for (let i = 0; i < vitaSprites.length; i++) {
             let v = vitaSprites[i];
             const dx = v.x + v.width / 2 - bird.x;
@@ -369,9 +349,7 @@
           }
           checkCollisions();
         } else if (gameState === "gameover") {
-          if (!bird.grounded) {
-            updateBird();
-          }
+          if (!bird.grounded) updateBird();
           for (let i = 0; i < vitaSprites.length; i++) {
             vitaSprites[i].opacity = Math.max(0, vitaSprites[i].opacity - CONFIG.vita.fadeOutSpeed);
           }
