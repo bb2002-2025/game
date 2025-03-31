@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <!-- Viewport meta for proper scaling -->
+    <!-- Viewport meta for proper scaling on all devices -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>About Bruno</title>
     <style>
@@ -12,25 +12,22 @@
         font-weight: normal;
         font-style: normal;
       }
-      /* Use the sky color as the page background so letterboxing blends in */
+      /* Set page background so no black borders appear */
       html, body {
         margin: 0;
         padding: 0;
         background: rgb(110,190,201);
         overflow: hidden;
       }
-      /* The canvas is fixed at 414x736 (design resolution) */
+      /* The canvas’s internal resolution remains fixed */
       #gameCanvas {
         display: block;
-        position: absolute;
-        left: 0;
-        top: 0;
         background: black;
       }
     </style>
   </head>
   <body>
-    <!-- Canvas remains at design resolution -->
+    <!-- Canvas internal resolution is set to the design resolution -->
     <canvas id="gameCanvas" width="414" height="736"></canvas>
     <script>
       //==================================================
@@ -55,7 +52,6 @@
           flapDuration: 300,  // Animation duration in milliseconds
           flapFrameTime: 50   // Time per frame in milliseconds
         },
-        // Hitbox settings:
         hitboxes: {
           enabled: false,
           bird: {
@@ -132,19 +128,25 @@
       //==================================================
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = false; // For crisp drawing
 
-      // For a fixed internal resolution, worldWidth equals designWidth.
+      // We'll keep the internal resolution at design size:
+      const internalWidth = CONFIG.designWidth;
+      const internalHeight = CONFIG.designHeight;
+      // "worldWidth" is simply the design width in our game logic
       let worldWidth = CONFIG.designWidth;
       const groundY = CONFIG.designHeight * CONFIG.groundRatio;
 
-      // CSS-scale the canvas to center it in the viewport
+      // For full-screen mode, we set the CSS size to fill the viewport.
+      // We also compute scale factors to map input coordinates.
+      let inputScaleX = 1, inputScaleY = 1;
       function resizeCanvas() {
-        const scale = Math.min(window.innerWidth / CONFIG.designWidth, window.innerHeight / CONFIG.designHeight);
-        canvas.style.transformOrigin = "top left";
-        canvas.style.transform = "scale(" + scale + ")";
-        canvas.style.left = ((window.innerWidth - CONFIG.designWidth * scale) / 2) + "px";
-        canvas.style.top = ((window.innerHeight - CONFIG.designHeight * scale) / 2) + "px";
+        // Set the canvas's CSS width and height to match the window
+        canvas.style.width = window.innerWidth + "px";
+        canvas.style.height = window.innerHeight + "px";
+        // Update input scales: converting from screen (CSS) back to design units.
+        inputScaleX = CONFIG.designWidth / window.innerWidth;
+        inputScaleY = CONFIG.designHeight / window.innerHeight;
       }
       window.addEventListener("resize", resizeCanvas);
       resizeCanvas();
@@ -171,7 +173,7 @@
       let flashAlpha = 0;
       let vitaCounter = 0;
       let lastTime = 0;
-      // Standard requestAnimationFrame at 60 FPS
+      // Using standard requestAnimationFrame (60 FPS)
       let lastRenderTime = 0;
       let gameOverUI = { x: 0, y: 0, width: 0, height: 0, cellWidth: 0, cellHeight: 0 };
       let gamePaused = false;
@@ -211,9 +213,7 @@
         { name: "pause", src: "assets/pause.png" },
         { name: "pause_2", src: "assets/pause_2.png" }
       ];
-
       const ASSETS = {};
-
       function loadAllImages(list, callback) {
         let loadedCount = 0;
         list.forEach(item => {
@@ -407,10 +407,10 @@
       }
 
       //==================================================
-      // DRAWING
+      // DRAWING: Everything is drawn using design coordinates
       //==================================================
       function draw() {
-        ctx.clearRect(0, 0, CONFIG.designWidth, CONFIG.designHeight);
+        ctx.clearRect(0, 0, internalWidth, internalHeight);
         // Draw sky:
         ctx.fillStyle = "rgb(110,190,201)";
         ctx.fillRect(0, 0, worldWidth, groundY);
@@ -604,20 +604,18 @@
       }
 
       //==================================================
-      // EVENT HANDLERS
+      // EVENT HANDLERS (with updated input scaling)
       //==================================================
       window.addEventListener("mousedown", handleInput);
       window.addEventListener("touchstart", (e) => {
         e.preventDefault();
         handleInput(e.touches[0]);
       });
-
       function handleInput(e) {
         let rect = canvas.getBoundingClientRect();
-        // Use the current CSS scale for coordinate conversion:
-        let scale = parseFloat(canvas.style.transform.replace("scale(", "").replace(")", "")) || 1;
-        let clickX = (e.clientX - rect.left) / scale;
-        let clickY = (e.clientY - rect.top) / scale;
+        // Convert screen coordinates into design coordinates
+        let clickX = (e.clientX - rect.left) * inputScaleX;
+        let clickY = (e.clientY - rect.top) * inputScaleY;
         if (gameState !== "gameover" && !gamePaused) {
           const buttonSize = CONFIG.ui.pause.buttonSize;
           const margin = CONFIG.ui.pause.margin;
@@ -637,7 +635,6 @@
           handleJump();
         }
       }
-
       function handlePauseClick(clickX, clickY) {
         if (clickX >= pauseUI.x && clickX <= pauseUI.x + pauseUI.width &&
             clickY >= pauseUI.y && clickY <= pauseUI.y + pauseUI.height) {
@@ -656,7 +653,6 @@
           }
         }
       }
-
       function handleGameOverClick(clickX, clickY) {
         if (Date.now() - gameOverTimer < CONFIG.ui.gameOver.cooldownPeriod) return;
         if (clickX >= gameOverUI.x && clickX <= gameOverUI.x + gameOverUI.width &&
@@ -683,7 +679,6 @@
           }
         }
       }
-
       function handleJump() {
         if (gameState === "menu") {
           gameState = "play";
@@ -694,12 +689,10 @@
           startFlapAnimation();
         }
       }
-
       function startFlapAnimation() {
         flapStartTime = Date.now();
         isFlapping = true;
       }
-
       //==================================================
       // PIPE & SPRITE SPAWNING
       //==================================================
@@ -747,7 +740,6 @@
           vitaCounter++;
         }
       }
-
       //==================================================
       // HELPER FUNCTION: Rectangle Overlap
       //==================================================
@@ -759,14 +751,12 @@
           r1.y > r2.y + r2.height
         );
       }
-
       //==================================================
       // START THE GAME
       //==================================================
       loadAllImages(imageList, () => {
         init();
       });
-
       document.addEventListener("visibilitychange", function() {
         if (document.hidden) {
           gamePaused = true;
