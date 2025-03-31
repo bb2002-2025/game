@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <!-- Viewport meta for proper mobile scaling -->
+    <!-- Viewport meta for proper scaling -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>About Bruno</title>
     <style>
@@ -12,14 +12,14 @@
         font-weight: normal;
         font-style: normal;
       }
-      /* No scrollbars, full screen background */
+      /* Use the sky color as the page background so letterboxing blends in */
       html, body {
         margin: 0;
         padding: 0;
-        background: #000;
+        background: rgb(110,190,201);
         overflow: hidden;
       }
-      /* The canvas is fixed at the design resolution */
+      /* The canvas is fixed at 414x736 (design resolution) */
       #gameCanvas {
         display: block;
         position: absolute;
@@ -30,7 +30,7 @@
     </style>
   </head>
   <body>
-    <!-- Canvas is set to design resolution (414x736) -->
+    <!-- Canvas remains at design resolution -->
     <canvas id="gameCanvas" width="414" height="736"></canvas>
     <script>
       //==================================================
@@ -132,13 +132,13 @@
       //==================================================
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
-      ctx.imageSmoothingEnabled = false; // Disable smoothing for crisp, faster drawing
+      ctx.imageSmoothingEnabled = false;
 
-      // For our fixed-resolution canvas, worldWidth equals designWidth.
+      // For a fixed internal resolution, worldWidth equals designWidth.
       let worldWidth = CONFIG.designWidth;
       const groundY = CONFIG.designHeight * CONFIG.groundRatio;
 
-      // We'll use a CSS scale to enlarge the canvas to fill the viewport.
+      // CSS-scale the canvas to center it in the viewport
       function resizeCanvas() {
         const scale = Math.min(window.innerWidth / CONFIG.designWidth, window.innerHeight / CONFIG.designHeight);
         canvas.style.transformOrigin = "top left";
@@ -147,7 +147,6 @@
         canvas.style.top = ((window.innerHeight - CONFIG.designHeight * scale) / 2) + "px";
       }
       window.addEventListener("resize", resizeCanvas);
-      // Call once on load:
       resizeCanvas();
 
       let gameState = "menu"; // "menu", "play", "gameover"
@@ -172,8 +171,7 @@
       let flashAlpha = 0;
       let vitaCounter = 0;
       let lastTime = 0;
-      // Frame throttling: target 60 FPS
-      let frameThrottle = 1000 / 60;
+      // Standard requestAnimationFrame at 60 FPS
       let lastRenderTime = 0;
       let gameOverUI = { x: 0, y: 0, width: 0, height: 0, cellWidth: 0, cellHeight: 0 };
       let gamePaused = false;
@@ -238,7 +236,6 @@
       // INITIAL SETUP AFTER IMAGES LOADED
       //==================================================
       function init() {
-        // Set up bird animation frames:
         birdFrames = [
           ASSETS["head_normal"],
           ASSETS["head_1"],
@@ -268,8 +265,6 @@
         bird.rotation = 0;
         bird.spriteIndex = 0;
         bird.frameTimer = 0;
-
-        // Initialize ground segments
         let groundWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
         const neededSegments = Math.ceil(worldWidth / groundWidth) + 4;
         for (let i = 0; i < neededSegments; i++) {
@@ -279,8 +274,6 @@
             width: groundWidth
           });
         }
-
-        // Spawn initial pipes using fixed starting distance
         const initialX = CONFIG.pipe.startingDistance;
         let countPipes = Math.max(2, Math.ceil((worldWidth - initialX) / CONFIG.pipe.spacing) + 1);
         for (let i = 0; i < countPipes; i++) {
@@ -289,18 +282,14 @@
       }
 
       //==================================================
-      // GAME LOOP WITH FRAME THROTTLING (60 FPS)
+      // GAME LOOP
       //==================================================
       function gameLoop(timestamp) {
-        let delta = timestamp - lastRenderTime;
-        if (delta >= frameThrottle) {
-          let dt = timestamp - lastTime;
-          dt = Math.min(dt, 50); // cap dt
-          lastTime = timestamp;
-          update(dt);
-          draw();
-          lastRenderTime = timestamp;
-        }
+        let dt = timestamp - lastTime;
+        dt = Math.min(dt, 50);
+        lastTime = timestamp;
+        update(dt);
+        draw();
         window.requestAnimationFrame(gameLoop);
       }
 
@@ -418,7 +407,7 @@
       }
 
       //==================================================
-      // DRAWING (Using fixed design resolution)
+      // DRAWING
       //==================================================
       function draw() {
         ctx.clearRect(0, 0, CONFIG.designWidth, CONFIG.designHeight);
@@ -625,9 +614,10 @@
 
       function handleInput(e) {
         let rect = canvas.getBoundingClientRect();
-        // Convert coordinates relative to design resolution
-        let clickX = (e.clientX - rect.left) / (parseFloat(canvas.style.transform.split('(')[1]) || 1);
-        let clickY = (e.clientY - rect.top) / (parseFloat(canvas.style.transform.split('(')[1]) || 1);
+        // Use the current CSS scale for coordinate conversion:
+        let scale = parseFloat(canvas.style.transform.replace("scale(", "").replace(")", "")) || 1;
+        let clickX = (e.clientX - rect.left) / scale;
+        let clickY = (e.clientY - rect.top) / scale;
         if (gameState !== "gameover" && !gamePaused) {
           const buttonSize = CONFIG.ui.pause.buttonSize;
           const margin = CONFIG.ui.pause.margin;
