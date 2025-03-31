@@ -44,7 +44,7 @@
     <canvas id="gameCanvas" width="414" height="736"></canvas>
     <script>
       //==================================================
-      // CONFIGURATION: Tweak all key values here
+      // CONFIGURATION: Tweak key values here
       //==================================================
       const CONFIG = {
         designWidth: 414,
@@ -137,12 +137,14 @@
       };
 
       //==================================================
-      // PERFORMANCE DETECTION
+      // PERFORMANCE CALIBRATION
       //==================================================
-      // We'll measure 60 frames and then compute a multiplier.
+      // Measure performance for a fixed number of frames and compute a multiplier.
       let performanceMultiplier = 1;
-      const targetFrameTime = 16.7; // Ideal frame time for ~60 FPS in ms
+      const targetFrameTime = 16.7; // ~60 FPS target in ms
       const testFrameCount = 60;
+      const minMultiplier = 1;  // Do not slow down faster devices.
+      const maxMultiplier = 2;  // Do not amplify more than 2x.
       let frameTimes = [];
       let perfLastTime = 0;
       function measurePerformance(timestamp) {
@@ -153,17 +155,19 @@
         if (frameTimes.length < testFrameCount) {
           window.requestAnimationFrame(measurePerformance);
         } else {
-          const avgFrameTime = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+          const sum = frameTimes.reduce((a, b) => a + b, 0);
+          const avgFrameTime = sum / frameTimes.length;
           performanceMultiplier = avgFrameTime / targetFrameTime;
-          // Optionally, cap the multiplier so it doesn't go too high
-          if (performanceMultiplier > 2) performanceMultiplier = 2;
-          // Apply multiplier to the physics and speed values.
+          // Clamp the multiplier
+          if (performanceMultiplier < minMultiplier) performanceMultiplier = minMultiplier;
+          if (performanceMultiplier > maxMultiplier) performanceMultiplier = maxMultiplier;
+          // Apply multiplier once and for all
           CONFIG.physics.gravity *= performanceMultiplier;
           CONFIG.physics.flapForce *= performanceMultiplier;
           CONFIG.physics.maxFallSpeed *= performanceMultiplier;
           CONFIG.speeds.scrollSpeed *= performanceMultiplier;
           CONFIG.speeds.bgScrollSpeed *= performanceMultiplier;
-          // Now that performance is measured and values are adjusted, start the game.
+          // Start the game
           init();
         }
       }
@@ -822,8 +826,8 @@
         );
       }
 
+      // Start loading images, then run performance calibration.
       loadAllImages(imageList, () => {
-        // Start performance measurement before running the game.
         window.requestAnimationFrame(measurePerformance);
       });
 
