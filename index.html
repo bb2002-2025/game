@@ -136,6 +136,16 @@
         }
       };
 
+      // Detect Safari (excluding Chrome) and adjust game speeds if needed
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      if (isSafari) {
+        // Increase physics and scrolling speeds by about 40%
+        CONFIG.physics.gravity *= 1.4;
+        CONFIG.physics.flapForce *= 1.4;
+        CONFIG.speeds.scrollSpeed *= 1.4;
+        CONFIG.speeds.bgScrollSpeed *= 1.4;
+      }
+
       //==================================================
       // GLOBALS & INITIAL SETUP
       //==================================================
