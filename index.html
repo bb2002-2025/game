@@ -503,7 +503,7 @@
         ctx.restore();
 
         if (flashAlpha > 0) {
-          ctx.fillStyle = rgba(255,255,255,${flashAlpha / 255});
+          ctx.fillStyle = `rgba(255,255,255,${flashAlpha / 255})`;
           ctx.fillRect(0, 0, worldWidth, CONFIG.designHeight);
         }
 
@@ -754,7 +754,7 @@
         };
         pipes.push(topPipe, bottomPipe);
         if (vitaCounter < CONFIG.vita.max) {
-          let vitaName = vita_${vitaCounter + 1};
+          let vitaName = `vita_${vitaCounter + 1}`;
           let vitaImg = ASSETS[vitaName];
           if (vitaImg) {
             let pipeWidth = topPipe.width;
