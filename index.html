@@ -2,6 +2,8 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <!-- Added viewport meta tag for proper scaling on mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>About Bruno</title>
     <style>
       @font-face {
@@ -127,6 +129,7 @@
       //==================================================
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false; // Disable image smoothing for performance
 
       // Calculate world scaling:
       let scaleFactor = window.innerHeight / CONFIG.designHeight;
@@ -134,10 +137,11 @@
 
       // Resize handler updates canvas and world dimensions
       function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        canvas.width = Math.floor(window.innerWidth);
+        canvas.height = Math.floor(window.innerHeight);
         scaleFactor = canvas.height / CONFIG.designHeight;
         worldWidth = canvas.width / scaleFactor;
+        ctx.imageSmoothingEnabled = false; // Ensure smoothing remains disabled
       }
       window.addEventListener("resize", resizeCanvas);
 
@@ -180,6 +184,10 @@
 
       // Time tracking:
       let lastTime = 0;
+      
+      // For frame throttling: Target 60 FPS
+      let frameThrottle = 1000 / 60;
+      let lastRenderTime = 0;
 
       // Game over UI dimensions
       let gameOverUI = {
@@ -325,14 +333,18 @@
       }
 
       //==================================================
-      // GAME LOOP
+      // GAME LOOP WITH FRAME THROTTLING (60 FPS)
       //==================================================
       function gameLoop(timestamp) {
-        let dt = timestamp - lastTime;
-        dt = Math.min(dt, 50); // cap dt to 50ms to avoid huge update steps
-        lastTime = timestamp;
-        update(dt);
-        draw();
+        let delta = timestamp - lastRenderTime;
+        if (delta >= frameThrottle) {
+          let dt = timestamp - lastTime;
+          dt = Math.min(dt, 50); // cap dt to 50ms
+          lastTime = timestamp;
+          update(dt);
+          draw();
+          lastRenderTime = timestamp;
+        }
         window.requestAnimationFrame(gameLoop);
       }
 
@@ -630,7 +642,7 @@
         }
 
         // Always draw hitboxes using hitboxScale (red for bird, lime for pipes)
-        if (CONFIG.hitboxes.enabled) {  // Changed from SHOW_HITBOXES to CONFIG.hitboxes.enabled
+        if (CONFIG.hitboxes.enabled) {
           const hitboxWidth = bird.width * CONFIG.hitboxes.bird.scale;
           const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
           const hitboxX = bird.x + (bird.width - hitboxWidth) / 2;
@@ -701,7 +713,6 @@
           ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
         }
         if (ASSETS["tutorial"]) {
-          // Tutorial image stays the same size
           let img = ASSETS["tutorial"];
           let x = bird.x + bird.width;
           let y = bird.y - (img.height / 4);
@@ -714,9 +725,9 @@
           let img = ASSETS["game_over"];
           let maxWidth = worldWidth * CONFIG.ui.maxWidthPercent;
           let scale = Math.min(
-            CONFIG.ui.gameOver.scale,  // Use game over specific scale
+            CONFIG.ui.gameOver.scale,
             maxWidth / img.width,
-            (CONFIG.designHeight * 0.8) / img.height  // Increased from 0.4 to 0.8 for larger vertical space
+            (CONFIG.designHeight * 0.8) / img.height
           );
           let scaledWidth = img.width * scale;
           let scaledHeight = img.height * scale;
@@ -725,7 +736,7 @@
           gameOverUI.width = scaledWidth;
           gameOverUI.height = scaledHeight;
           gameOverUI.x = (worldWidth - scaledWidth) / 2;
-          gameOverUI.y = (CONFIG.designHeight - scaledHeight) / 2;  // Center vertically
+          gameOverUI.y = (CONFIG.designHeight - scaledHeight) / 2;
           gameOverUI.cellWidth = scaledWidth / CONFIG.ui.gameOver.grid.cols;
           gameOverUI.cellHeight = scaledHeight / CONFIG.ui.gameOver.grid.rows;
 
@@ -743,7 +754,6 @@
       });
 
       function handleInput(e) {
-        // Convert event coordinates to canvas space
         let rect = canvas.getBoundingClientRect();
         let clickX = (e.clientX - rect.left) / scaleFactor;
         let clickY = (e.clientY - rect.top) / scaleFactor;
@@ -759,7 +769,6 @@
           }
         }
 
-        // Handle pause popup interactions
         if (gamePaused) {
           handlePauseClick(clickX, clickY);
           return;
@@ -777,10 +786,8 @@
             clickX <= pauseUI.x + pauseUI.width &&
             clickY >= pauseUI.y && 
             clickY <= pauseUI.y + pauseUI.height) {
-          
           let relativeY = clickY - pauseUI.y;
           let rowIndex = Math.floor(relativeY / pauseUI.rowHeight);
-          
           switch(rowIndex) {
             case 0: // Resume
               gamePaused = false;
@@ -796,30 +803,21 @@
       }
 
       function handleGameOverClick(clickX, clickY) {
-        // Check cooldown period
         if (Date.now() - gameOverTimer < CONFIG.ui.gameOver.cooldownPeriod) {
           return;
         }
-
-        // Check if click is within game over UI bounds
         if (clickX >= gameOverUI.x && 
             clickX <= gameOverUI.x + gameOverUI.width &&
             clickY >= gameOverUI.y && 
             clickY <= gameOverUI.y + gameOverUI.height) {
-          
-          // Calculate grid position
           let relativeX = clickX - gameOverUI.x;
           let relativeY = clickY - gameOverUI.y;
           let colIndex = Math.floor(relativeX / gameOverUI.cellWidth);
           let rowIndex = Math.floor(relativeY / gameOverUI.cellHeight);
-          
-          // Check if click is in active area
           if (colIndex >= CONFIG.ui.gameOver.grid.activeMinCol && 
               colIndex <= CONFIG.ui.gameOver.grid.activeMaxCol &&
               rowIndex >= CONFIG.ui.gameOver.grid.activeMinRow && 
               rowIndex <= CONFIG.ui.gameOver.grid.activeMaxRow) {
-            
-            // Handle button clicks based on row
             switch(rowIndex) {
               case 1: // Restart
                 resetGame();
@@ -855,18 +853,12 @@
       // PIPE & SPRITE SPAWNING
       //==================================================
       function spawnPipeSet(xPos) {
-        // Calculate actual pipe height (use default if asset not loaded)
         const pipeHeight = ASSETS["pipe_top"]?.height || CONFIG.pipe.defaultHeight;
-        
-        // Calculate safe boundaries for gap center:
         const minCenter = CONFIG.pipe.minEdgeDistance + (CONFIG.pipe.gap / 2);
         const maxCenter = groundY - CONFIG.pipe.minEdgeDistance - (CONFIG.pipe.gap / 2);
-        
         let gapCenter = Math.floor(Math.random() * (maxCenter - minCenter)) + minCenter;
-
         let topY = gapCenter - (CONFIG.pipe.gap / 2) - pipeHeight;
         let bottomY = gapCenter + (CONFIG.pipe.gap / 2);
-
         let topPipe = {
           x: xPos,
           y: topY,
@@ -883,9 +875,7 @@
           type: "bottom",
           passed: false
         };
-
         pipes.push(topPipe, bottomPipe);
-
         if (vitaCounter < CONFIG.vita.max) {
           let vitaName = `vita_${vitaCounter + 1}`;
           let vitaImg = ASSETS[vitaName];
@@ -894,14 +884,13 @@
             let nextPipeX = xPos + CONFIG.pipe.spacing;
             let midpointX = xPos + pipeWidth + (nextPipeX - (xPos + pipeWidth)) / 2;
             let vitaWidth = vitaImg.width * CONFIG.vita.scale;
-
             vitaSprites.push({
-              x: midpointX - vitaWidth / 2, // Center the vita image horizontally
-              y: 55,  // Changed from 0 to 20 to move vita images down
+              x: midpointX - vitaWidth / 2,
+              y: 55,
               width: vitaWidth,
               height: vitaImg.height * CONFIG.vita.scale,
               img: vitaImg,
-              opacity: 0  // Start invisible
+              opacity: 0
             });
           }
           vitaCounter++;
@@ -927,13 +916,12 @@
         init();
       });
 
-      // Add page visibility listener to pause/resume game
       document.addEventListener("visibilitychange", function() {
         if (document.hidden) {
           gamePaused = true;
         } else if (gameState !== "gameover") {
           gamePaused = false;
-          lastTime = performance.now(); // reset lastTime to avoid huge dt on resume
+          lastTime = performance.now(); // Reset lastTime to avoid huge dt on resume
         }
       });
     </script>
