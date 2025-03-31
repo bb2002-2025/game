@@ -25,8 +25,19 @@
         will-change: transform;
         -webkit-transform: translateZ(0);
         backface-visibility: hidden;
+        image-rendering: pixelated;
+        /* For older IE/Edge */
+        -ms-interpolation-mode: nearest-neighbor;
       }
     </style>
+    <script>
+      // Polyfill for requestAnimationFrame to support older Safari versions
+      window.requestAnimationFrame = window.requestAnimationFrame ||
+                                     window.webkitRequestAnimationFrame ||
+                                     function(callback) {
+                                       return setTimeout(callback, 1000 / 60);
+                                     };
+    </script>
   </head>
   <body>
     <!-- We use a design resolution (phone-like) of 414x736 -->
