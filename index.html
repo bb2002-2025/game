@@ -144,9 +144,13 @@
       const targetFrameTime = 16.7; // ~60 FPS target in ms
       const testFrameCount = 60;
       const minMultiplier = 1;  // Do not slow down faster devices.
-      const maxMultiplier = 2;  // Do not amplify more than 2x.
+      const maxMultiplier = 2;  // Cap the amplification.
       let frameTimes = [];
       let perfLastTime = 0;
+      
+      // Detect Safari (excluding Chrome/Android)
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
       function measurePerformance(timestamp) {
         if (perfLastTime) {
           frameTimes.push(timestamp - perfLastTime);
@@ -158,16 +162,20 @@
           const sum = frameTimes.reduce((a, b) => a + b, 0);
           const avgFrameTime = sum / frameTimes.length;
           performanceMultiplier = avgFrameTime / targetFrameTime;
-          // Clamp the multiplier
+          // If on Safari, amplify by an extra factor of 1.4.
+          if (isSafari) {
+            performanceMultiplier *= 1.4;
+          }
+          // Clamp the multiplier.
           if (performanceMultiplier < minMultiplier) performanceMultiplier = minMultiplier;
           if (performanceMultiplier > maxMultiplier) performanceMultiplier = maxMultiplier;
-          // Apply multiplier once and for all
+          // Apply multiplier to configuration values.
           CONFIG.physics.gravity *= performanceMultiplier;
           CONFIG.physics.flapForce *= performanceMultiplier;
           CONFIG.physics.maxFallSpeed *= performanceMultiplier;
           CONFIG.speeds.scrollSpeed *= performanceMultiplier;
           CONFIG.speeds.bgScrollSpeed *= performanceMultiplier;
-          // Start the game
+          // Start the game.
           init();
         }
       }
