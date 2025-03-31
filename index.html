@@ -10,14 +10,14 @@
         font-weight: normal;
         font-style: normal;
       }
-      /* No scrollbars, full screen black background */
+      /* No scrollbars, full screen */
       html, body {
         margin: 0;
         padding: 0;
         background: #000;
         overflow: hidden;
       }
-      /* Canvas will be letterboxed in JS – just center it here */
+      /* Center canvas with hardware acceleration hints */
       #gameCanvas {
         display: block;
         margin: 0 auto;
@@ -29,10 +29,11 @@
     </style>
   </head>
   <body>
-    <canvas id="gameCanvas"></canvas>
+    <!-- We use a design resolution (phone-like) of 414x736 -->
+    <canvas id="gameCanvas" width="414" height="736"></canvas>
     <script>
       //==================================================
-      // CONFIGURATION & GLOBALS
+      // CONFIGURATION: Tweak all key values here
       //==================================================
       const CONFIG = {
         designWidth: 414,
@@ -55,9 +56,19 @@
         },
         hitboxes: {
           enabled: false,
-          bird: { scale: 0.3, color: "red", lineWidth: 1 },
-          pipe: { color: "lime", lineWidth: 1 },
-          floor: { color: "blue", lineWidth: 2 }
+          bird: {
+            scale: 0.3,
+            color: "red",
+            lineWidth: 1
+          },
+          pipe: {
+            color: "lime",
+            lineWidth: 1
+          },
+          floor: {
+            color: "blue",
+            lineWidth: 2
+          }
         },
         pipe: {
           spacing: 550,
@@ -71,10 +82,9 @@
           scrollSpeed: 1.5,
           bgScrollSpeed: 0.5
         },
-        // Lowered to reduce big alpha draws in Safari
         flash: {
           speed: 10,
-          maxAlpha: 80
+          maxAlpha: 180
         },
         vita: {
           max: 12,
@@ -83,9 +93,7 @@
           fadeOutSpeed: 0.01,
           fadeDistance: 500
         },
-        // Using a bit smaller than 78px to avoid huge text. 
-        // We'll re-introduce strokeText for a black outline.
-        scoreFont: "60px '8-bit Arcade In'",
+        scoreFont: "78px '8-bit Arcade In'",
         scorePosition: {
           x: 0.5,
           y: 736 * 0.92
@@ -117,46 +125,31 @@
         }
       };
 
-      // Canvas, context, scaling
+      //==================================================
+      // GLOBALS & INITIAL SETUP
+      //==================================================
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
+      // Disable smoothing (with vendor prefix)
       ctx.imageSmoothingEnabled = false;
       ctx.webkitImageSmoothingEnabled = false;
 
-      // We'll dynamically set canvas size to preserve aspect ratio
-      let scaleFactor = 1;     // how many screen pixels per design pixel
-      let worldWidth = CONFIG.designWidth;
-      let worldHeight = CONFIG.designHeight;
+      // Calculate world scaling based on full-screen dimensions:
+      let scaleFactor = window.innerHeight / CONFIG.designHeight;
+      let worldWidth = window.innerWidth / scaleFactor;
 
       function resizeCanvas() {
-        const designRatio = CONFIG.designWidth / CONFIG.designHeight;
-        const windowRatio = window.innerWidth / window.innerHeight;
-        let newWidth, newHeight;
-
-        if (windowRatio > designRatio) {
-          // Letterbox horizontally
-          newHeight = window.innerHeight;
-          newWidth = newHeight * designRatio;
-        } else {
-          // Letterbox vertically
-          newWidth = window.innerWidth;
-          newHeight = newWidth / designRatio;
-        }
-        canvas.width = Math.round(newWidth);
-        canvas.height = Math.round(newHeight);
-
-        // Scale factor: ratio of current canvas size to the design size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
         scaleFactor = canvas.height / CONFIG.designHeight;
         worldWidth = canvas.width / scaleFactor;
-        worldHeight = canvas.height / scaleFactor;
+        ctx.imageSmoothingEnabled = false;
+        ctx.webkitImageSmoothingEnabled = false;
       }
-
       window.addEventListener("resize", resizeCanvas);
 
-      //==================================================
-      // GAME VARIABLES
-      //==================================================
       const groundY = CONFIG.designHeight * CONFIG.groundRatio;
+
       let gameState = "menu"; // "menu", "play", "gameover"
       let score = 0;
       let pipes = [];
@@ -174,7 +167,6 @@
         spriteIndex: 0,
         frameTimer: 0
       };
-
       let birdFrames = [];
       let bgScroll = 0;
       let flashAlpha = 0;
@@ -218,7 +210,6 @@
         { name: "pause", src: "assets/pause.png" },
         { name: "pause_2", src: "assets/pause_2.png" }
       ];
-
       const ASSETS = {};
       function loadAllImages(list, callback) {
         let loadedCount = 0;
@@ -243,9 +234,8 @@
       // INITIAL SETUP AFTER IMAGES LOADED
       //==================================================
       function init() {
-        resizeCanvas(); // letterbox the canvas to avoid distortion
-
-        // Bird animation frames
+        resizeCanvas(); // Set initial dimensions
+        // Set up bird animation frames
         birdFrames = [
           ASSETS["head_normal"],
           ASSETS["head_1"],
@@ -254,7 +244,6 @@
           ASSETS["head_4"],
           ASSETS["head_normal"]
         ];
-
         resetGame();
         window.requestAnimationFrame(gameLoop);
       }
@@ -276,10 +265,8 @@
         bird.rotation = 0;
         bird.spriteIndex = 0;
         bird.frameTimer = 0;
-
-        // Initialize ground
         let groundWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
-        const neededSegments = Math.ceil(CONFIG.designWidth / groundWidth) + 4;
+        const neededSegments = Math.ceil(worldWidth / groundWidth) + 4;
         for (let i = 0; i < neededSegments; i++) {
           groundSegments.push({
             x: i * (groundWidth - CONFIG.ground.overlap),
@@ -287,13 +274,8 @@
             width: groundWidth
           });
         }
-
-        // Initial pipes
         const initialX = CONFIG.pipe.startingDistance;
-        let countPipes = Math.max(
-          2,
-          Math.ceil((CONFIG.designWidth - initialX) / CONFIG.pipe.spacing) + 1
-        );
+        let countPipes = Math.max(2, Math.ceil((worldWidth - initialX) / CONFIG.pipe.spacing) + 1);
         for (let i = 0; i < countPipes; i++) {
           spawnPipeSet(initialX + i * CONFIG.pipe.spacing);
         }
@@ -312,94 +294,59 @@
       }
 
       //==================================================
-      // UPDATE LOGIC
+      // UPDATE LOGIC (using plain for loops)
       //==================================================
       function update(dt) {
         if (gamePaused) return;
-
         if (gameState === "menu") {
-          // Hide vita sprites
-          for (let i = 0; i < vitaSprites.length; i++) {
+          for (let i = 0, len = vitaSprites.length; i < len; i++) {
             vitaSprites[i].opacity = 0;
           }
         } else if (gameState === "play") {
-          // Scroll background
           bgScroll -= CONFIG.speeds.bgScrollSpeed;
           if (ASSETS["skyline"]) {
             let sw = ASSETS["skyline"].width;
             if (bgScroll <= -sw) bgScroll = 0;
           }
-
           updateBird();
-
-          // Move pipes
           for (let i = 0; i < pipes.length; i++) {
             pipes[i].x -= CONFIG.speeds.scrollSpeed;
           }
-          // Remove off-screen pipes
-          for (let i = pipes.length - 1; i >= 0; i--) {
-            if (pipes[i].x + pipes[i].width < 0) {
-              pipes.splice(i, 1);
-            }
-          }
-          // Possibly spawn new pipes
-          let rightmost = pipes.length > 0 ? pipes[0].x : CONFIG.designWidth * 0.75;
-          for (let i = 1; i < pipes.length; i++) {
-            if (pipes[i].x > rightmost) {
-              rightmost = pipes[i].x;
-            }
-          }
-          if (rightmost < CONFIG.designWidth) {
+          pipes = pipes.filter(p => p.x + p.width > 0);
+          let rightmost = (pipes.length > 0)
+            ? Math.max.apply(null, pipes.map(p => p.x))
+            : worldWidth * 0.75;
+          if (rightmost < worldWidth) {
             spawnPipeSet(rightmost + CONFIG.pipe.spacing);
           }
-
-          // Move ground
           for (let i = 0; i < groundSegments.length; i++) {
             groundSegments[i].x -= CONFIG.speeds.scrollSpeed;
           }
-          for (let i = groundSegments.length - 1; i >= 0; i--) {
-            if (groundSegments[i].x + groundSegments[i].width < 0) {
-              groundSegments.splice(i, 1);
-            }
-          }
-          // Possibly add ground
+          groundSegments = groundSegments.filter(g => g.x + g.width > 0);
           let groundImgWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
-          let rightmostX = 0;
-          if (groundSegments.length > 0) {
-            rightmostX = groundSegments[0].x + groundSegments[0].width;
-            for (let i = 1; i < groundSegments.length; i++) {
-              let segRight = groundSegments[i].x + groundSegments[i].width;
-              if (segRight > rightmostX) rightmostX = segRight;
-            }
-          }
-          if (rightmostX < CONFIG.designWidth + groundImgWidth) {
+          let rightmostX = (groundSegments.length > 0)
+            ? Math.max.apply(null, groundSegments.map(g => g.x + g.width))
+            : 0;
+          if (rightmostX < worldWidth + groundImgWidth) {
             groundSegments.push({
               x: rightmostX - CONFIG.ground.overlap,
               y: groundY,
               width: groundImgWidth
             });
           }
-
-          // Move vita sprites
           for (let i = 0; i < vitaSprites.length; i++) {
             vitaSprites[i].x -= CONFIG.speeds.scrollSpeed;
           }
-          for (let i = vitaSprites.length - 1; i >= 0; i--) {
-            if (vitaSprites[i].x + vitaSprites[i].width < 0) {
-              vitaSprites.splice(i, 1);
-            }
-          }
-          // Fade in/out
+          vitaSprites = vitaSprites.filter(v => v.x + v.width > 0);
           for (let i = 0; i < vitaSprites.length; i++) {
             let v = vitaSprites[i];
-            const dx = (v.x + v.width / 2) - bird.x;
+            const dx = v.x + v.width / 2 - bird.x;
             if (dx <= CONFIG.vita.fadeDistance && bird.alive) {
               v.opacity = Math.min(1, v.opacity + CONFIG.vita.fadeInSpeed);
             } else {
               v.opacity = Math.max(0, v.opacity - CONFIG.vita.fadeOutSpeed);
             }
           }
-
           checkCollisions();
         } else if (gameState === "gameover") {
           if (!bird.grounded) updateBird();
@@ -407,7 +354,6 @@
             vitaSprites[i].opacity = Math.max(0, vitaSprites[i].opacity - CONFIG.vita.fadeOutSpeed);
           }
         }
-        // Decrease flashAlpha
         if (flashAlpha > 0) {
           flashAlpha = Math.max(0, flashAlpha - CONFIG.flash.speed);
         }
@@ -429,8 +375,8 @@
         bird.vel += CONFIG.physics.gravity;
         if (bird.vel > CONFIG.physics.maxFallSpeed) bird.vel = CONFIG.physics.maxFallSpeed;
         bird.y += bird.vel;
-        const hitboxH = bird.height * CONFIG.hitboxes.bird.scale;
-        const visualOffset = (bird.height - hitboxH) / 2;
+        const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
+        const visualOffset = (bird.height - hitboxHeight) / 2;
         if (bird.y + bird.height - visualOffset >= groundY) {
           bird.y = groundY - bird.height + visualOffset;
           bird.grounded = true;
@@ -441,18 +387,19 @@
       }
 
       function checkCollisions() {
-        const hitboxW = bird.width * CONFIG.hitboxes.bird.scale;
-        const hitboxH = bird.height * CONFIG.hitboxes.bird.scale;
-        const hitboxX = bird.x + (bird.width - hitboxW) / 2;
-        const hitboxY = bird.y + (bird.height - hitboxH) / 2;
-        const birdHitbox = { x: hitboxX, y: hitboxY, width: hitboxW, height: hitboxH };
-
+        const hitboxWidth = bird.width * CONFIG.hitboxes.bird.scale;
+        const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
+        const hitboxX = bird.x + (bird.width - hitboxWidth) / 2;
+        const hitboxY = bird.y + (bird.height - hitboxHeight) / 2;
+        const birdHitbox = { x: hitboxX, y: hitboxY, width: hitboxWidth, height: hitboxHeight };
         for (let i = 0; i < pipes.length; i++) {
           let pipe = pipes[i];
-          if (!(birdHitbox.x + birdHitbox.width < pipe.x ||
-                birdHitbox.x > pipe.x + pipe.width ||
-                birdHitbox.y + birdHitbox.height < pipe.y ||
-                birdHitbox.y > pipe.y + pipe.height)) {
+          if (!(
+            birdHitbox.x + birdHitbox.width < pipe.x ||
+            birdHitbox.x > pipe.x + pipe.width ||
+            birdHitbox.y + birdHitbox.height < pipe.y ||
+            birdHitbox.y > pipe.y + pipe.height
+          )) {
             if (bird.alive) {
               bird.alive = false;
               flashAlpha = CONFIG.flash.maxAlpha;
@@ -460,7 +407,6 @@
             }
             return;
           }
-          // scoring
           if (!pipe.passed && pipe.type === "bottom") {
             if (bird.x > pipe.x) {
               pipe.passed = true;
@@ -468,9 +414,8 @@
             }
           }
         }
-        // ground collision
         if (birdHitbox.y + birdHitbox.height >= groundY) {
-          const visualOffset = (bird.height - hitboxH) / 2;
+          const visualOffset = (bird.height - hitboxHeight) / 2;
           bird.y = groundY - bird.height + visualOffset;
           bird.grounded = true;
           bird.alive = false;
@@ -485,20 +430,17 @@
       }
 
       //==================================================
-      // DRAW
+      // DRAWING (using plain for loops)
       //==================================================
       function draw() {
-        // Scale all drawing to our letterboxed canvas
         ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
         ctx.clearRect(0, 0, worldWidth, CONFIG.designHeight);
 
-        // Background
         ctx.fillStyle = "rgb(110,190,201)";
         ctx.fillRect(0, 0, worldWidth, groundY);
         ctx.fillStyle = "rgb(221,216,157)";
         ctx.fillRect(0, groundY, worldWidth, CONFIG.designHeight - groundY);
 
-        // Skyline
         if (ASSETS["skyline"]) {
           let sw = ASSETS["skyline"].width;
           let sh = ASSETS["skyline"].height;
@@ -511,10 +453,9 @@
           }
         }
 
-        // Pipes
         for (let i = 0; i < pipes.length; i++) {
           let pipe = pipes[i];
-          let img = pipe.type === "top" ? ASSETS["pipe_top"] : ASSETS["pipe_bottom"];
+          let img = (pipe.type === "top") ? ASSETS["pipe_top"] : ASSETS["pipe_bottom"];
           if (img) {
             ctx.drawImage(img, pipe.x, pipe.y);
           } else {
@@ -523,14 +464,12 @@
           }
         }
 
-        // Ground
         if (ASSETS["ground"]) {
           for (let i = 0; i < groundSegments.length; i++) {
             let seg = groundSegments[i];
             ctx.drawImage(ASSETS["ground"], seg.x, seg.y);
           }
         } else {
-          // fallback
           for (let i = 0; i < groundSegments.length; i++) {
             let seg = groundSegments[i];
             ctx.fillStyle = "rgb(221,216,157)";
@@ -538,7 +477,6 @@
           }
         }
 
-        // Vita sprites
         for (let i = 0; i < vitaSprites.length; i++) {
           let v = vitaSprites[i];
           if (v.img && v.opacity > 0) {
@@ -549,41 +487,32 @@
           }
         }
 
-        // Bird
         drawBird();
 
-        // Draw score with black outline
-        ctx.save();
         ctx.fillStyle = "#ffffff";
         ctx.strokeStyle = "#000000";
-        ctx.lineWidth = 6; // Adjust thickness as you like
-        ctx.font = CONFIG.scoreFont; // e.g. "60px '8-bit Arcade In'"
+        ctx.lineWidth = 8;
+        ctx.font = CONFIG.scoreFont;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-
+        ctx.save();
         ctx.translate(worldWidth * CONFIG.scorePosition.x, CONFIG.scorePosition.y);
-        // slight vertical stretch if you want (like original):
         ctx.scale(1, 1.5);
-
-        const scoreStr = score.toString();
-        ctx.strokeText(scoreStr, 0, 0);
-        ctx.fillText(scoreStr, 0, 0);
+        ctx.strokeText(score.toString(), 0, 0);
+        ctx.fillText(score.toString(), 0, 0);
         ctx.restore();
 
-        // Flash overlay
         if (flashAlpha > 0) {
           ctx.fillStyle = `rgba(255,255,255,${flashAlpha / 255})`;
           ctx.fillRect(0, 0, worldWidth, CONFIG.designHeight);
         }
 
-        // Menu / Game Over
         if (gameState === "menu") {
           drawMenu();
         } else if (gameState === "gameover") {
           drawGameOver();
         }
 
-        // Pause button
         if (gameState === "play" && !gamePaused) {
           const buttonSize = CONFIG.ui.pause.buttonSize;
           const margin = CONFIG.ui.pause.margin;
@@ -592,7 +521,6 @@
           }
         }
 
-        // Pause overlay
         if (gamePaused && ASSETS["pause_2"]) {
           let img = ASSETS["pause_2"];
           let maxWidth = worldWidth * CONFIG.ui.maxWidthPercent;
@@ -608,29 +536,25 @@
           pauseUI.x = (worldWidth - scaledWidth) / 2;
           pauseUI.y = (CONFIG.designHeight - scaledHeight) / 2;
           pauseUI.rowHeight = scaledHeight / 3;
-
           ctx.fillStyle = "rgba(0,0,0,0.5)";
           ctx.fillRect(0, 0, worldWidth, CONFIG.designHeight);
-          ctx.drawImage(img, pauseUI.x, pauseUI.y, scaledWidth, scaledHeight);
+          ctx.drawImage(ASSETS["pause_2"], pauseUI.x, pauseUI.y, scaledWidth, scaledHeight);
         }
 
-        // Debug hitboxes if needed
         if (CONFIG.hitboxes.enabled) {
-          const hitboxW = bird.width * CONFIG.hitboxes.bird.scale;
-          const hitboxH = bird.height * CONFIG.hitboxes.bird.scale;
-          const hitboxX = bird.x + (bird.width - hitboxW) / 2;
-          const hitboxY = bird.y + (bird.height - hitboxH) / 2;
+          const hitboxWidth = bird.width * CONFIG.hitboxes.bird.scale;
+          const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
+          const hitboxX = bird.x + (bird.width - hitboxWidth) / 2;
+          const hitboxY = bird.y + (bird.height - hitboxHeight) / 2;
           ctx.strokeStyle = CONFIG.hitboxes.bird.color;
           ctx.lineWidth = CONFIG.hitboxes.bird.lineWidth;
-          ctx.strokeRect(hitboxX, hitboxY, hitboxW, hitboxH);
-
+          ctx.strokeRect(hitboxX, hitboxY, hitboxWidth, hitboxHeight);
           for (let i = 0; i < pipes.length; i++) {
-            let pipe = pipes[i];
             ctx.strokeStyle = CONFIG.hitboxes.pipe.color;
             ctx.lineWidth = CONFIG.hitboxes.pipe.lineWidth;
+            let pipe = pipes[i];
             ctx.strokeRect(pipe.x, pipe.y, pipe.width, pipe.height);
           }
-
           ctx.strokeStyle = CONFIG.hitboxes.floor.color;
           ctx.lineWidth = CONFIG.hitboxes.floor.lineWidth;
           ctx.beginPath();
@@ -643,7 +567,6 @@
       function drawBird() {
         let frame = birdFrames[0];
         if (!frame) return;
-
         if (isFlapping) {
           const elapsed = Date.now() - flapStartTime;
           if (elapsed >= CONFIG.bird.flapDuration) {
@@ -653,7 +576,6 @@
             frame = birdFrames[frameIndex];
           }
         }
-
         let angle = 0;
         if (!bird.alive) {
           angle = CONFIG.bird.rotationDown;
@@ -679,13 +601,13 @@
           let scaledWidth = img.width * scaleVal;
           let scaledHeight = img.height * scaleVal;
           let x = (worldWidth - scaledWidth) / 2;
-          let y = Math.max(CONFIG.ui.minMargin, CONFIG.designHeight * 0.2 - scaledHeight / 2);
+          let y = Math.max(CONFIG.ui.minMargin, CONFIG.designHeight * 0.2 - (scaledHeight / 2));
           ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
         }
         if (ASSETS["tutorial"]) {
           let img = ASSETS["tutorial"];
           let x = bird.x + bird.width;
-          let y = bird.y - img.height / 4;
+          let y = bird.y - (img.height / 4);
           ctx.drawImage(img, x, y, 105, 135);
         }
       }
@@ -711,9 +633,6 @@
         }
       }
 
-      //==================================================
-      // INPUT HANDLERS
-      //==================================================
       window.addEventListener("mousedown", handleInput);
       window.addEventListener("touchstart", (e) => {
         e.preventDefault();
@@ -722,20 +641,13 @@
 
       function handleInput(e) {
         let rect = canvas.getBoundingClientRect();
-        // Convert from screen coords to game coords
         let clickX = (e.clientX - rect.left) / scaleFactor;
         let clickY = (e.clientY - rect.top) / scaleFactor;
-
         if (gameState !== "gameover" && !gamePaused) {
-          // Pause button
           const buttonSize = CONFIG.ui.pause.buttonSize;
           const margin = CONFIG.ui.pause.margin;
-          if (
-            clickX >= margin &&
-            clickX <= margin + buttonSize &&
-            clickY >= margin &&
-            clickY <= margin + buttonSize
-          ) {
+          if (clickX >= margin && clickX <= margin + buttonSize &&
+              clickY >= margin && clickY <= margin + buttonSize) {
             gamePaused = true;
             return;
           }
@@ -751,57 +663,50 @@
         }
       }
 
-      function handlePauseClick(cx, cy) {
-        if (
-          cx >= pauseUI.x &&
-          cx <= pauseUI.x + pauseUI.width &&
-          cy >= pauseUI.y &&
-          cy <= pauseUI.y + pauseUI.height
-        ) {
-          let relativeY = cy - pauseUI.y;
+      function handlePauseClick(clickX, clickY) {
+        if (clickX >= pauseUI.x &&
+            clickX <= pauseUI.x + pauseUI.width &&
+            clickY >= pauseUI.y &&
+            clickY <= pauseUI.y + pauseUI.height) {
+          let relativeY = clickY - pauseUI.y;
           let rowIndex = Math.floor(relativeY / pauseUI.rowHeight);
-          switch (rowIndex) {
+          switch(rowIndex) {
             case 0:
               gamePaused = false;
               break;
             case 1:
-              window.location.href = "https://brunobrissa.com/about";
+              window.location.href = 'https://brunobrissa.com/about';
               break;
             case 2:
-              window.location.href = "https://brunobrissa.com";
+              window.location.href = 'https://brunobrissa.com';
               break;
           }
         }
       }
 
-      function handleGameOverClick(cx, cy) {
+      function handleGameOverClick(clickX, clickY) {
         if (Date.now() - gameOverTimer < CONFIG.ui.gameOver.cooldownPeriod) return;
-        if (
-          cx >= gameOverUI.x &&
-          cx <= gameOverUI.x + gameOverUI.width &&
-          cy >= gameOverUI.y &&
-          cy <= gameOverUI.y + gameOverUI.height
-        ) {
-          let relativeX = cx - gameOverUI.x;
-          let relativeY = cy - gameOverUI.y;
+        if (clickX >= gameOverUI.x &&
+            clickX <= gameOverUI.x + gameOverUI.width &&
+            clickY >= gameOverUI.y &&
+            clickY <= gameOverUI.y + gameOverUI.height) {
+          let relativeX = clickX - gameOverUI.x;
+          let relativeY = clickY - gameOverUI.y;
           let colIndex = Math.floor(relativeX / gameOverUI.cellWidth);
           let rowIndex = Math.floor(relativeY / gameOverUI.cellHeight);
-
-          if (
-            colIndex >= CONFIG.ui.gameOver.grid.activeMinCol &&
-            colIndex <= CONFIG.ui.gameOver.grid.activeMaxCol &&
-            rowIndex >= CONFIG.ui.gameOver.grid.activeMinRow &&
-            rowIndex <= CONFIG.ui.gameOver.grid.activeMaxRow
-          ) {
-            switch (rowIndex) {
+          if (colIndex >= CONFIG.ui.gameOver.grid.activeMinCol &&
+              colIndex <= CONFIG.ui.gameOver.grid.activeMaxCol &&
+              rowIndex >= CONFIG.ui.gameOver.grid.activeMinRow &&
+              rowIndex <= CONFIG.ui.gameOver.grid.activeMaxRow) {
+            switch(rowIndex) {
               case 1:
                 resetGame();
                 break;
               case 2:
-                window.location.href = "https://brunobrissa.com/about";
+                window.location.href = 'https://brunobrissa.com/about';
                 break;
               case 3:
-                window.location.href = "https://brunobrissa.com";
+                window.location.href = 'https://brunobrissa.com';
                 break;
             }
           }
@@ -829,10 +734,8 @@
         const minCenter = CONFIG.pipe.minEdgeDistance + (CONFIG.pipe.gap / 2);
         const maxCenter = groundY - CONFIG.pipe.minEdgeDistance - (CONFIG.pipe.gap / 2);
         let gapCenter = Math.floor(Math.random() * (maxCenter - minCenter)) + minCenter;
-
-        let topY = gapCenter - CONFIG.pipe.gap / 2 - pipeHeight;
-        let bottomY = gapCenter + CONFIG.pipe.gap / 2;
-
+        let topY = gapCenter - (CONFIG.pipe.gap / 2) - pipeHeight;
+        let bottomY = gapCenter + (CONFIG.pipe.gap / 2);
         let topPipe = {
           x: xPos,
           y: topY,
@@ -850,15 +753,13 @@
           passed: false
         };
         pipes.push(topPipe, bottomPipe);
-
-        // spawn vita
         if (vitaCounter < CONFIG.vita.max) {
           let vitaName = `vita_${vitaCounter + 1}`;
           let vitaImg = ASSETS[vitaName];
           if (vitaImg) {
             let pipeWidth = topPipe.width;
             let nextPipeX = xPos + CONFIG.pipe.spacing;
-            let midpointX = pipeWidth + (nextPipeX - (xPos + pipeWidth)) / 2 + xPos;
+            let midpointX = xPos + pipeWidth + (nextPipeX - (xPos + pipeWidth)) / 2;
             let vitaWidth = vitaImg.width * CONFIG.vita.scale;
             vitaSprites.push({
               x: midpointX - vitaWidth / 2,
@@ -873,9 +774,15 @@
         }
       }
 
-      //==================================================
-      // START
-      //==================================================
+      function rectOverlap(r1, r2) {
+        return !(
+          r1.x + r1.width < r2.x ||
+          r1.x > r2.x + r2.width ||
+          r1.y + r1.height < r2.y ||
+          r1.y > r2.y + r2.height
+        );
+      }
+
       loadAllImages(imageList, () => {
         init();
       });
