@@ -31,7 +31,7 @@
       }
     </style>
     <script>
-      // Polyfill for requestAnimationFrame to support older Safari versions
+      // Polyfill for requestAnimationFrame (for older browsers)
       window.requestAnimationFrame = window.requestAnimationFrame ||
                                      window.webkitRequestAnimationFrame ||
                                      function(callback) {
@@ -136,15 +136,36 @@
         }
       };
 
-      // Detect Safari (excluding Chrome) and adjust game speeds if needed
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      if (isSafari) {
-        // Increase physics and scrolling speeds for Safari only
-        CONFIG.physics.gravity *= 2;
-        CONFIG.physics.flapForce *= 1.7;
-        CONFIG.physics.maxFallSpeed *= 2;
-        CONFIG.speeds.scrollSpeed *= 1.7;
-        CONFIG.speeds.bgScrollSpeed *= 1.7;
+      //==================================================
+      // PERFORMANCE DETECTION
+      //==================================================
+      // We'll measure 60 frames and then compute a multiplier.
+      let performanceMultiplier = 1;
+      const targetFrameTime = 16.7; // Ideal frame time for ~60 FPS in ms
+      const testFrameCount = 60;
+      let frameTimes = [];
+      let perfLastTime = 0;
+      function measurePerformance(timestamp) {
+        if (perfLastTime) {
+          frameTimes.push(timestamp - perfLastTime);
+        }
+        perfLastTime = timestamp;
+        if (frameTimes.length < testFrameCount) {
+          window.requestAnimationFrame(measurePerformance);
+        } else {
+          const avgFrameTime = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+          performanceMultiplier = avgFrameTime / targetFrameTime;
+          // Optionally, cap the multiplier so it doesn't go too high
+          if (performanceMultiplier > 2) performanceMultiplier = 2;
+          // Apply multiplier to the physics and speed values.
+          CONFIG.physics.gravity *= performanceMultiplier;
+          CONFIG.physics.flapForce *= performanceMultiplier;
+          CONFIG.physics.maxFallSpeed *= performanceMultiplier;
+          CONFIG.speeds.scrollSpeed *= performanceMultiplier;
+          CONFIG.speeds.bgScrollSpeed *= performanceMultiplier;
+          // Now that performance is measured and values are adjusted, start the game.
+          init();
+        }
       }
 
       //==================================================
@@ -152,11 +173,9 @@
       //==================================================
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
-      // Disable smoothing (with vendor prefix)
       ctx.imageSmoothingEnabled = false;
       ctx.webkitImageSmoothingEnabled = false;
 
-      // Calculate world scaling based on full-screen dimensions:
       let scaleFactor = window.innerHeight / CONFIG.designHeight;
       let worldWidth = window.innerWidth / scaleFactor;
 
@@ -316,7 +335,7 @@
       }
 
       //==================================================
-      // UPDATE LOGIC (using plain for loops)
+      // UPDATE LOGIC
       //==================================================
       function update(dt) {
         if (gamePaused) return;
@@ -416,12 +435,10 @@
         const birdHitbox = { x: hitboxX, y: hitboxY, width: hitboxWidth, height: hitboxHeight };
         for (let i = 0; i < pipes.length; i++) {
           let pipe = pipes[i];
-          if (!(
-            birdHitbox.x + birdHitbox.width < pipe.x ||
-            birdHitbox.x > pipe.x + pipe.width ||
-            birdHitbox.y + birdHitbox.height < pipe.y ||
-            birdHitbox.y > pipe.y + pipe.height
-          )) {
+          if (!(birdHitbox.x + birdHitbox.width < pipe.x ||
+                birdHitbox.x > pipe.x + pipe.width ||
+                birdHitbox.y + birdHitbox.height < pipe.y ||
+                birdHitbox.y > pipe.y + pipe.height)) {
             if (bird.alive) {
               bird.alive = false;
               flashAlpha = CONFIG.flash.maxAlpha;
@@ -452,7 +469,7 @@
       }
 
       //==================================================
-      // DRAWING (using plain for loops)
+      // DRAWING
       //==================================================
       function draw() {
         ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
@@ -806,7 +823,8 @@
       }
 
       loadAllImages(imageList, () => {
-        init();
+        // Start performance measurement before running the game.
+        window.requestAnimationFrame(measurePerformance);
       });
 
       document.addEventListener("visibilitychange", function() {
