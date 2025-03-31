@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <!-- Added viewport meta tag for proper scaling on mobile -->
+    <!-- Viewport meta for proper mobile scaling -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>About Bruno</title>
     <style>
@@ -12,22 +12,25 @@
         font-weight: normal;
         font-style: normal;
       }
-      /* No scrollbars, full screen */
+      /* No scrollbars, full screen background */
       html, body {
         margin: 0;
         padding: 0;
         background: #000;
         overflow: hidden;
       }
+      /* The canvas is fixed at the design resolution */
       #gameCanvas {
         display: block;
-        margin: 0 auto;
+        position: absolute;
+        left: 0;
+        top: 0;
         background: black;
       }
     </style>
   </head>
   <body>
-    <!-- We use a design resolution (phone-like) of 414x736 -->
+    <!-- Canvas is set to design resolution (414x736) -->
     <canvas id="gameCanvas" width="414" height="736"></canvas>
     <script>
       //==================================================
@@ -52,9 +55,9 @@
           flapDuration: 300,  // Animation duration in milliseconds
           flapFrameTime: 50   // Time per frame in milliseconds
         },
-        // All hitbox settings grouped together:
+        // Hitbox settings:
         hitboxes: {
-          enabled: false, // Changed from true to false
+          enabled: false,
           bird: {
             scale: 0.3,
             color: "red",
@@ -74,8 +77,8 @@
           gap: 200,
           defaultWidth: 52,
           defaultHeight: 320,
-          minEdgeDistance: 60,  // Minimum visible pipe pixels at screen edges
-          startingDistance: 600  // New: minimum distance for first pipe
+          minEdgeDistance: 60,
+          startingDistance: 600
         },
         speeds: {
           scrollSpeed: 1.5,
@@ -88,39 +91,39 @@
         vita: {
           max: 12,
           scale: 0.6,
-          fadeInSpeed: 0.01,    
+          fadeInSpeed: 0.01,
           fadeOutSpeed: 0.01,
-          fadeDistance: 500  // Distance at which vita starts fading in
+          fadeDistance: 500
         },
         scoreFont: "78px '8-bit Arcade In'",
         scorePosition: {
           x: 0.5,
-          y: 736 * 0.92  // Move closer to bottom (95% instead of 90%)
+          y: 736 * 0.92
         },
         ui: {
-          scale: 1.5,  // Base scale for UI elements
-          minMargin: 20,  // Minimum pixels from screen edges
-          maxWidthPercent: 0.9,  // Maximum width as percentage of screen
+          scale: 1.5,
+          minMargin: 20,
+          maxWidthPercent: 0.9,
           gameOver: {
-            scale: 3.0,     // Added specific scale for game over screen
-            cooldownPeriod: 800,  // 0.8 seconds in milliseconds
+            scale: 3.0,
+            cooldownPeriod: 800,
             grid: {
               rows: 4,
               cols: 5,
-              activeMinRow: 1,    // Second row (0-based)
-              activeMaxRow: 3,    // Fourth row
-              activeMinCol: 1,    // Second column
-              activeMaxCol: 3     // Fourth column
+              activeMinRow: 1,
+              activeMaxRow: 3,
+              activeMinCol: 1,
+              activeMaxCol: 3
             }
           },
           pause: {
-            buttonSize: 60,     
-            margin: 6,         // Reduced from 10 to 6
+            buttonSize: 60,
+            margin: 6,
             popupScale: 1
           }
         },
         ground: {
-          overlap: 1  // 1 pixel overlap between segments
+          overlap: 1
         }
       };
 
@@ -129,34 +132,29 @@
       //==================================================
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
-      ctx.imageSmoothingEnabled = false; // Disable image smoothing for performance
+      ctx.imageSmoothingEnabled = false; // Disable smoothing for crisp, faster drawing
 
-      // Calculate world scaling:
-      let scaleFactor = window.innerHeight / CONFIG.designHeight;
-      let worldWidth = window.innerWidth / scaleFactor;
+      // For our fixed-resolution canvas, worldWidth equals designWidth.
+      let worldWidth = CONFIG.designWidth;
+      const groundY = CONFIG.designHeight * CONFIG.groundRatio;
 
-      // Resize handler updates canvas and world dimensions
+      // We'll use a CSS scale to enlarge the canvas to fill the viewport.
       function resizeCanvas() {
-        canvas.width = Math.floor(window.innerWidth);
-        canvas.height = Math.floor(window.innerHeight);
-        scaleFactor = canvas.height / CONFIG.designHeight;
-        worldWidth = canvas.width / scaleFactor;
-        ctx.imageSmoothingEnabled = false; // Ensure smoothing remains disabled
+        const scale = Math.min(window.innerWidth / CONFIG.designWidth, window.innerHeight / CONFIG.designHeight);
+        canvas.style.transformOrigin = "top left";
+        canvas.style.transform = "scale(" + scale + ")";
+        canvas.style.left = ((window.innerWidth - CONFIG.designWidth * scale) / 2) + "px";
+        canvas.style.top = ((window.innerHeight - CONFIG.designHeight * scale) / 2) + "px";
       }
       window.addEventListener("resize", resizeCanvas);
-
-      // Define ground Y using design units:
-      const groundY = CONFIG.designHeight * CONFIG.groundRatio;
+      // Call once on load:
+      resizeCanvas();
 
       let gameState = "menu"; // "menu", "play", "gameover"
       let score = 0;
-
-      // Arrays for pipes, ground segments, and vita sprites:
       let pipes = [];
       let groundSegments = [];
       let vitaSprites = [];
-
-      // Define the bird object using CONFIG values:
       let bird = {
         x: CONFIG.bird.startX,
         y: CONFIG.bird.startY,
@@ -169,56 +167,24 @@
         spriteIndex: 0,
         frameTimer: 0
       };
-
-      // For bird animation frames (loaded images):
       let birdFrames = [];
-
-      // Background scroll offset:
       let bgScroll = 0;
-
-      // Flash effect variables:
       let flashAlpha = 0;
-
-      // Vita counter:
       let vitaCounter = 0;
-
-      // Time tracking:
       let lastTime = 0;
-      
-      // For frame throttling: Target 60 FPS
+      // Frame throttling: target 60 FPS
       let frameThrottle = 1000 / 60;
       let lastRenderTime = 0;
-
-      // Game over UI dimensions
-      let gameOverUI = {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        cellWidth: 0,
-        cellHeight: 0
-      };
-
-      // Pause functionality
+      let gameOverUI = { x: 0, y: 0, width: 0, height: 0, cellWidth: 0, cellHeight: 0 };
       let gamePaused = false;
-      let pauseUI = {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        rowHeight: 0
-      };
-
-      // Add to globals section
+      let pauseUI = { x: 0, y: 0, width: 0, height: 0, rowHeight: 0 };
       let gameOverTimer = 0;
-
-      let flapStartTime = 0;    // Track when flap animation started
-      let isFlapping = false;   // Track if bird is currently in flap animation
+      let flapStartTime = 0;
+      let isFlapping = false;
 
       //==================================================
       // IMAGE LOADING
       //==================================================
-      // List of images to load (ensure filenames match your assets folder)
       const imageList = [
         { name: "head_normal", src: "assets/head_normal.png" },
         { name: "head_1", src: "assets/head_1.png" },
@@ -258,16 +224,12 @@
           img.onload = () => {
             ASSETS[item.name] = img;
             loadedCount++;
-            if (loadedCount === list.length) {
-              callback();
-            }
+            if (loadedCount === list.length) callback();
           };
           img.onerror = () => {
             console.warn("Failed to load image:", item.src);
             loadedCount++;
-            if (loadedCount === list.length) {
-              callback();
-            }
+            if (loadedCount === list.length) callback();
           };
         });
       }
@@ -276,8 +238,6 @@
       // INITIAL SETUP AFTER IMAGES LOADED
       //==================================================
       function init() {
-        resizeCanvas(); // Set initial canvas dimensions
-
         // Set up bird animation frames:
         birdFrames = [
           ASSETS["head_normal"],
@@ -287,7 +247,6 @@
           ASSETS["head_4"],
           ASSETS["head_normal"]
         ];
-
         resetGame();
         window.requestAnimationFrame(gameLoop);
       }
@@ -298,12 +257,9 @@
         flashAlpha = 0;
         bgScroll = 0;
         vitaCounter = 0;
-
         pipes = [];
         groundSegments = [];
         vitaSprites = [];
-
-        // Reset bird position and state:
         bird.x = CONFIG.bird.startX;
         bird.y = CONFIG.bird.startY;
         bird.vel = 0;
@@ -313,18 +269,18 @@
         bird.spriteIndex = 0;
         bird.frameTimer = 0;
 
-        // Initialize ground segments with better wide screen coverage and overlap
+        // Initialize ground segments
         let groundWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
-        const neededSegments = Math.ceil(worldWidth / groundWidth) + 4; // Increased buffer
+        const neededSegments = Math.ceil(worldWidth / groundWidth) + 4;
         for (let i = 0; i < neededSegments; i++) {
           groundSegments.push({
-            x: i * (groundWidth - CONFIG.ground.overlap), // Subtract overlap from positioning
+            x: i * (groundWidth - CONFIG.ground.overlap),
             y: groundY,
             width: groundWidth
           });
         }
 
-        // Spawn initial pipes using a fixed starting distance (fixes huge gap on wide screens)
+        // Spawn initial pipes using fixed starting distance
         const initialX = CONFIG.pipe.startingDistance;
         let countPipes = Math.max(2, Math.ceil((worldWidth - initialX) / CONFIG.pipe.spacing) + 1);
         for (let i = 0; i < countPipes; i++) {
@@ -339,7 +295,7 @@
         let delta = timestamp - lastRenderTime;
         if (delta >= frameThrottle) {
           let dt = timestamp - lastTime;
-          dt = Math.min(dt, 50); // cap dt to 50ms
+          dt = Math.min(dt, 50); // cap dt
           lastTime = timestamp;
           update(dt);
           draw();
@@ -352,51 +308,33 @@
       // UPDATE LOGIC
       //==================================================
       function update(dt) {
-        if (gamePaused) return;  // Skip all updates when paused
-
+        if (gamePaused) return;
         if (gameState === "menu") {
           vitaSprites.forEach(v => v.opacity = 0);
         } else if (gameState === "play") {
           bgScroll -= CONFIG.speeds.bgScrollSpeed;
           if (ASSETS["skyline"]) {
             let sw = ASSETS["skyline"].width;
-            if (bgScroll <= -sw) {
-              bgScroll = 0;
-            }
+            if (bgScroll <= -sw) bgScroll = 0;
           }
-
           updateBird();
-
           pipes.forEach(p => { p.x -= CONFIG.speeds.scrollSpeed; });
           pipes = pipes.filter(p => p.x + p.width > 0);
-
-          // Find rightmost pipe, or use a screen-relative position if no pipes exist
-          let rightmost = pipes.length > 0 
-            ? Math.max(...pipes.map(p => p.x))
-            : worldWidth * 0.75;  // Changed from fixed 550 to relative width
-            
-          if (rightmost < worldWidth) {
-            spawnPipeSet(rightmost + CONFIG.pipe.spacing);
-          }
-
-          // Modified ground segment management
+          let rightmost = pipes.length > 0 ? Math.max(...pipes.map(p => p.x)) : worldWidth * 0.75;
+          if (rightmost < worldWidth) spawnPipeSet(rightmost + CONFIG.pipe.spacing);
           groundSegments.forEach(g => { g.x -= CONFIG.speeds.scrollSpeed; });
           groundSegments = groundSegments.filter(g => g.x + g.width > 0);
           let groundImgWidth = ASSETS["ground"] ? ASSETS["ground"].width : 640;
           let rightmostX = groundSegments.length > 0 ? Math.max(...groundSegments.map(g => g.x + g.width)) : 0;
-          // Instead of looping aggressively, add one segment per frame if needed
           if (rightmostX < worldWidth + groundImgWidth) {
-              groundSegments.push({
-                  x: rightmostX - CONFIG.ground.overlap, // Position adjusted for overlap
-                  y: groundY,
-                  width: groundImgWidth
-              });
+            groundSegments.push({
+              x: rightmostX - CONFIG.ground.overlap,
+              y: groundY,
+              width: groundImgWidth
+            });
           }
-
           vitaSprites.forEach(v => { v.x -= CONFIG.speeds.scrollSpeed; });
           vitaSprites = vitaSprites.filter(v => v.x + v.width > 0);
-
-          // Update vita sprites visibility based on distance to bird
           vitaSprites.forEach(v => {
             const dx = v.x + v.width / 2 - bird.x;
             if (dx <= CONFIG.vita.fadeDistance && bird.alive) {
@@ -405,32 +343,21 @@
               v.opacity = Math.max(0, v.opacity - CONFIG.vita.fadeOutSpeed);
             }
           });
-
           checkCollisions();
         } else if (gameState === "gameover") {
-          if (!bird.grounded) {
-            updateBird();
-          }
-
-          // Fade out vita sprites when game over
+          if (!bird.grounded) updateBird();
           vitaSprites.forEach(v => {
             v.opacity = Math.max(0, v.opacity - CONFIG.vita.fadeOutSpeed);
           });
         }
-
-        if (flashAlpha > 0) {
-          flashAlpha = Math.max(0, flashAlpha - CONFIG.flash.speed);
-        }
+        if (flashAlpha > 0) flashAlpha = Math.max(0, flashAlpha - CONFIG.flash.speed);
       }
 
       function updateBird() {
-        // When bird is not alive (e.g. after hitting a pipe), still check for floor collision
         if (!bird.alive) {
           bird.vel += CONFIG.physics.gravity;
           if (bird.vel > CONFIG.physics.maxFallSpeed) bird.vel = CONFIG.physics.maxFallSpeed;
           bird.y += bird.vel;
-
-          // Calculate ground position based on hitbox
           const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
           const visualOffset = (bird.height - hitboxHeight) / 2;
           if (bird.y + bird.height - visualOffset >= groundY) {
@@ -439,14 +366,9 @@
           }
           return;
         }
-
         bird.vel += CONFIG.physics.gravity;
-        if (bird.vel > CONFIG.physics.maxFallSpeed) {
-          bird.vel = CONFIG.physics.maxFallSpeed;
-        }
+        if (bird.vel > CONFIG.physics.maxFallSpeed) bird.vel = CONFIG.physics.maxFallSpeed;
         bird.y += bird.vel;
-
-        // Use same hitbox-based ground collision for live bird
         const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
         const visualOffset = (bird.height - hitboxHeight) / 2;
         if (bird.y + bird.height - visualOffset >= groundY) {
@@ -459,20 +381,11 @@
       }
 
       function checkCollisions() {
-        // Calculate bird hitbox dimensions
         const hitboxWidth = bird.width * CONFIG.hitboxes.bird.scale;
         const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
         const hitboxX = bird.x + (bird.width - hitboxWidth) / 2;
         const hitboxY = bird.y + (bird.height - hitboxHeight) / 2;
-
-        let birdHitbox = {
-          x: hitboxX,
-          y: hitboxY,
-          width: hitboxWidth,
-          height: hitboxHeight
-        };
-
-        // Check pipe collisions using hitbox
+        let birdHitbox = { x: hitboxX, y: hitboxY, width: hitboxWidth, height: hitboxHeight };
         for (let pipe of pipes) {
           if (rectOverlap(birdHitbox, pipe)) {
             if (bird.alive) {
@@ -483,14 +396,12 @@
             return;
           }
           if (!pipe.passed && pipe.type === "bottom") {
-            if (bird.x > pipe.x) {  // Award point at left edge of pipe
+            if (bird.x > pipe.x) {
               pipe.passed = true;
               score++;
             }
           }
         }
-
-        // Check ground collision using hitbox
         if (birdHitbox.y + birdHitbox.height >= groundY) {
           const visualOffset = (bird.height - hitboxHeight) / 2;
           bird.y = groundY - bird.height + visualOffset;
@@ -503,26 +414,21 @@
 
       function endGame() {
         gameState = "gameover";
-        gameOverTimer = Date.now();  // Store the time when game over started
+        gameOverTimer = Date.now();
       }
 
       //==================================================
-      // DRAWING
+      // DRAWING (Using fixed design resolution)
       //==================================================
       function draw() {
-        // Apply transform to scale design units to actual screen:
-        ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
-        ctx.clearRect(0, 0, worldWidth, CONFIG.designHeight);
-
+        ctx.clearRect(0, 0, CONFIG.designWidth, CONFIG.designHeight);
         // Draw sky:
         ctx.fillStyle = "rgb(110,190,201)";
         ctx.fillRect(0, 0, worldWidth, groundY);
-
         // Draw ground:
         ctx.fillStyle = "rgb(221,216,157)";
         ctx.fillRect(0, groundY, worldWidth, CONFIG.designHeight - groundY);
-
-        // Draw skyline (background):
+        // Draw skyline:
         if (ASSETS["skyline"]) {
           let sw = ASSETS["skyline"].width;
           let sh = ASSETS["skyline"].height;
@@ -534,8 +440,7 @@
             }
           }
         }
-
-        // Draw pipes (draw them before ground so they appear behind ground segments)
+        // Draw pipes:
         pipes.forEach(p => {
           let img = (p.type === "top") ? ASSETS["pipe_top"] : ASSETS["pipe_bottom"];
           if (img) {
@@ -545,20 +450,16 @@
             ctx.fillRect(p.x, p.y, p.width, p.height);
           }
         });
-
-        // Draw ground segments (over pipes):
+        // Draw ground segments:
         if (ASSETS["ground"]) {
-          groundSegments.forEach(g => {
-            ctx.drawImage(ASSETS["ground"], g.x, g.y);
-          });
+          groundSegments.forEach(g => { ctx.drawImage(ASSETS["ground"], g.x, g.y); });
         } else {
           groundSegments.forEach(g => {
             ctx.fillStyle = "rgb(221,216,157)";
             ctx.fillRect(g.x, g.y, g.width, CONFIG.designHeight - g.y);
           });
         }
-
-        // Draw vita sprites with opacity:
+        // Draw vita sprites:
         vitaSprites.forEach(v => {
           if (v.img && v.opacity > 0) {
             ctx.save();
@@ -567,11 +468,9 @@
             ctx.restore();
           }
         });
-
         // Draw bird:
         drawBird();
-
-        // Draw score with vertical stretch:
+        // Draw score:
         ctx.fillStyle = "#ffffff";
         ctx.strokeStyle = "#000000";
         ctx.lineWidth = 8;
@@ -580,37 +479,30 @@
         ctx.textBaseline = "middle";
         ctx.save();
         ctx.translate(worldWidth * CONFIG.scorePosition.x, CONFIG.scorePosition.y);
-        ctx.scale(1, 1.5);  // Stretch vertically by 50%
-        ctx.strokeText(score.toString(), 0, 0);  // Draw outline first
-        ctx.fillText(score.toString(), 0, 0);    // Then fill
+        ctx.scale(1, 1.5);
+        ctx.strokeText(score.toString(), 0, 0);
+        ctx.fillText(score.toString(), 0, 0);
         ctx.restore();
-
         // Draw flash effect:
         if (flashAlpha > 0) {
           ctx.fillStyle = `rgba(255,255,255,${flashAlpha / 255})`;
           ctx.fillRect(0, 0, worldWidth, CONFIG.designHeight);
         }
-
         // Draw menu or gameover UI:
         if (gameState === "menu") {
           drawMenu();
         } else if (gameState === "gameover") {
           drawGameOver();
         }
-
-        // Draw pause button (only visible during active gameplay)
+        // Draw pause button:
         if (gameState === "play" && !gamePaused) {
           const buttonSize = CONFIG.ui.pause.buttonSize;
           const margin = CONFIG.ui.pause.margin;
           if (ASSETS["pause"]) {
-            ctx.drawImage(ASSETS["pause"], 
-              margin, margin, 
-              buttonSize, buttonSize
-            );
+            ctx.drawImage(ASSETS["pause"], margin, margin, buttonSize, buttonSize);
           }
         }
-
-        // Draw pause popup if game is paused
+        // Draw pause popup if paused:
         if (gamePaused && ASSETS["pause_2"]) {
           let img = ASSETS["pause_2"];
           let maxWidth = worldWidth * CONFIG.ui.maxWidthPercent;
@@ -619,29 +511,18 @@
             maxWidth / img.width,
             (CONFIG.designHeight * 0.8) / img.height
           );
-          
           let scaledWidth = img.width * scale;
           let scaledHeight = img.height * scale;
-
-          // Store popup dimensions for click detection
           pauseUI.width = scaledWidth;
           pauseUI.height = scaledHeight;
           pauseUI.x = (worldWidth - scaledWidth) / 2;
           pauseUI.y = (CONFIG.designHeight - scaledHeight) / 2;
           pauseUI.rowHeight = scaledHeight / 3;
-
-          // Draw semi-transparent dark overlay
           ctx.fillStyle = "rgba(0,0,0,0.5)";
           ctx.fillRect(0, 0, worldWidth, CONFIG.designHeight);
-
-          // Draw pause popup
-          ctx.drawImage(ASSETS["pause_2"], 
-            pauseUI.x, pauseUI.y, 
-            pauseUI.width, pauseUI.height
-          );
+          ctx.drawImage(ASSETS["pause_2"], pauseUI.x, pauseUI.y, scaledWidth, scaledHeight);
         }
-
-        // Always draw hitboxes using hitboxScale (red for bird, lime for pipes)
+        // Draw hitboxes if enabled:
         if (CONFIG.hitboxes.enabled) {
           const hitboxWidth = bird.width * CONFIG.hitboxes.bird.scale;
           const hitboxHeight = bird.height * CONFIG.hitboxes.bird.scale;
@@ -650,14 +531,11 @@
           ctx.strokeStyle = CONFIG.hitboxes.bird.color;
           ctx.lineWidth = CONFIG.hitboxes.bird.lineWidth;
           ctx.strokeRect(hitboxX, hitboxY, hitboxWidth, hitboxHeight);
-
           pipes.forEach(p => {
             ctx.strokeStyle = CONFIG.hitboxes.pipe.color;
             ctx.lineWidth = CONFIG.hitboxes.pipe.lineWidth;
             ctx.strokeRect(p.x, p.y, p.width, p.height);
           });
-
-          // Draw floor collision line
           ctx.strokeStyle = CONFIG.hitboxes.floor.color;
           ctx.lineWidth = CONFIG.hitboxes.floor.lineWidth;
           ctx.beginPath();
@@ -670,26 +548,21 @@
       function drawBird() {
         let frame = birdFrames[0];
         if (!frame) return;
-
-        // Calculate flap animation phase
         if (isFlapping) {
           const elapsed = Date.now() - flapStartTime;
           if (elapsed >= CONFIG.bird.flapDuration) {
             isFlapping = false;
           } else {
-            // Calculate frame based on fixed time intervals
             const frameIndex = Math.floor(elapsed / CONFIG.bird.flapFrameTime) % birdFrames.length;
             frame = birdFrames[frameIndex];
           }
         }
-
         let angle = 0;
         if (!bird.alive) {
           angle = CONFIG.bird.rotationDown;
         } else if (bird.vel < 0) {
           angle = CONFIG.bird.rotationUp;
         }
-
         ctx.save();
         ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
         ctx.rotate((angle * Math.PI) / 180);
@@ -731,15 +604,12 @@
           );
           let scaledWidth = img.width * scale;
           let scaledHeight = img.height * scale;
-
-          // Store the game over UI dimensions for click detection
           gameOverUI.width = scaledWidth;
           gameOverUI.height = scaledHeight;
           gameOverUI.x = (worldWidth - scaledWidth) / 2;
           gameOverUI.y = (CONFIG.designHeight - scaledHeight) / 2;
           gameOverUI.cellWidth = scaledWidth / CONFIG.ui.gameOver.grid.cols;
           gameOverUI.cellHeight = scaledHeight / CONFIG.ui.gameOver.grid.rows;
-
           ctx.drawImage(img, gameOverUI.x, gameOverUI.y, scaledWidth, scaledHeight);
         }
       }
@@ -755,10 +625,9 @@
 
       function handleInput(e) {
         let rect = canvas.getBoundingClientRect();
-        let clickX = (e.clientX - rect.left) / scaleFactor;
-        let clickY = (e.clientY - rect.top) / scaleFactor;
-
-        // Check for pause button click
+        // Convert coordinates relative to design resolution
+        let clickX = (e.clientX - rect.left) / (parseFloat(canvas.style.transform.split('(')[1]) || 1);
+        let clickY = (e.clientY - rect.top) / (parseFloat(canvas.style.transform.split('(')[1]) || 1);
         if (gameState !== "gameover" && !gamePaused) {
           const buttonSize = CONFIG.ui.pause.buttonSize;
           const margin = CONFIG.ui.pause.margin;
@@ -768,12 +637,10 @@
             return;
           }
         }
-
         if (gamePaused) {
           handlePauseClick(clickX, clickY);
           return;
         }
-
         if (gameState === "gameover") {
           handleGameOverClick(clickX, clickY);
         } else {
@@ -782,20 +649,18 @@
       }
 
       function handlePauseClick(clickX, clickY) {
-        if (clickX >= pauseUI.x && 
-            clickX <= pauseUI.x + pauseUI.width &&
-            clickY >= pauseUI.y && 
-            clickY <= pauseUI.y + pauseUI.height) {
+        if (clickX >= pauseUI.x && clickX <= pauseUI.x + pauseUI.width &&
+            clickY >= pauseUI.y && clickY <= pauseUI.y + pauseUI.height) {
           let relativeY = clickY - pauseUI.y;
           let rowIndex = Math.floor(relativeY / pauseUI.rowHeight);
           switch(rowIndex) {
-            case 0: // Resume
+            case 0:
               gamePaused = false;
               break;
-            case 1: // About
-              window.location.href = 'https://brunobrissa.com/about';
+            case 1:
+              window.location.href = 'https://brunobrissa.com/about-play';
               break;
-            case 2: // Homepage
+            case 2:
               window.location.href = 'https://brunobrissa.com';
               break;
           }
@@ -803,29 +668,25 @@
       }
 
       function handleGameOverClick(clickX, clickY) {
-        if (Date.now() - gameOverTimer < CONFIG.ui.gameOver.cooldownPeriod) {
-          return;
-        }
-        if (clickX >= gameOverUI.x && 
-            clickX <= gameOverUI.x + gameOverUI.width &&
-            clickY >= gameOverUI.y && 
-            clickY <= gameOverUI.y + gameOverUI.height) {
+        if (Date.now() - gameOverTimer < CONFIG.ui.gameOver.cooldownPeriod) return;
+        if (clickX >= gameOverUI.x && clickX <= gameOverUI.x + gameOverUI.width &&
+            clickY >= gameOverUI.y && clickY <= gameOverUI.y + gameOverUI.height) {
           let relativeX = clickX - gameOverUI.x;
           let relativeY = clickY - gameOverUI.y;
           let colIndex = Math.floor(relativeX / gameOverUI.cellWidth);
           let rowIndex = Math.floor(relativeY / gameOverUI.cellHeight);
-          if (colIndex >= CONFIG.ui.gameOver.grid.activeMinCol && 
+          if (colIndex >= CONFIG.ui.gameOver.grid.activeMinCol &&
               colIndex <= CONFIG.ui.gameOver.grid.activeMaxCol &&
-              rowIndex >= CONFIG.ui.gameOver.grid.activeMinRow && 
+              rowIndex >= CONFIG.ui.gameOver.grid.activeMinRow &&
               rowIndex <= CONFIG.ui.gameOver.grid.activeMaxRow) {
             switch(rowIndex) {
-              case 1: // Restart
+              case 1:
                 resetGame();
                 break;
-              case 2: // About
+              case 2:
                 window.location.href = 'https://brunobrissa.com/about';
                 break;
-              case 3: // Homepage
+              case 3:
                 window.location.href = 'https://brunobrissa.com';
                 break;
             }
@@ -921,7 +782,7 @@
           gamePaused = true;
         } else if (gameState !== "gameover") {
           gamePaused = false;
-          lastTime = performance.now(); // Reset lastTime to avoid huge dt on resume
+          lastTime = performance.now();
         }
       });
     </script>
