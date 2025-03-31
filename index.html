@@ -18,7 +18,7 @@
         background: #000;
         overflow: hidden;
       }
-      /* The PixiJS canvas will be centered and we add hardware acceleration hints */
+      /* The PixiJS canvas will be centered and hardware-accelerated */
       canvas {
         display: block;
         margin: 0 auto;
@@ -28,8 +28,8 @@
         backface-visibility: hidden;
       }
     </style>
-    <!-- Include PixiJS v5.3.3 from cdnjs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.3.3/pixi.min.js"></script>
+    <!-- Include PixiJS v5.3.3 from jsDelivr -->
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@5.3.3/dist/pixi.min.js"></script>
   </head>
   <body>
     <script>
@@ -113,7 +113,6 @@
       /***************************************
        * PIXI APPLICATION SETUP
        ***************************************/
-      // Create a PixiJS application with the design resolution.
       const app = new PIXI.Application({
         width: CONFIG.designWidth,
         height: CONFIG.designHeight,
@@ -123,7 +122,6 @@
       });
       document.body.appendChild(app.view);
 
-      // Resize the view (CSS scale) to fill the screen while preserving aspect ratio.
       function resize() {
         const scale = Math.min(window.innerWidth / CONFIG.designWidth, window.innerHeight / CONFIG.designHeight);
         app.view.style.width = (CONFIG.designWidth * scale) + "px";
@@ -143,10 +141,8 @@
       const groundY = CONFIG.designHeight * CONFIG.groundRatio;
       let lastTime = performance.now();
 
-      // Main game container
       const gameScene = new PIXI.Container();
       app.stage.addChild(gameScene);
-      // UI container (if needed)
       const uiLayer = new PIXI.Container();
       app.stage.addChild(uiLayer);
 
@@ -194,8 +190,8 @@
       /***************************************
        * GAME OBJECTS
        ***************************************/
-      let bird;              // The bird as an AnimatedSprite
-      let birdTextures = []; // Textures for the bird animation
+      let bird;              
+      let birdTextures = [];
 
       /***************************************
        * SETUP FUNCTION (after assets load)
@@ -219,7 +215,7 @@
         bird.height = CONFIG.bird.height;
         gameScene.addChild(bird);
 
-        // Create ground segments as sprites
+        // Create ground segments
         const groundTexture = app.loader.resources["ground"].texture;
         let groundWidth = groundTexture.width;
         let segCount = Math.ceil(CONFIG.designWidth / groundWidth) + 4;
@@ -237,10 +233,7 @@
         skyline.y = groundY - skylineTexture.height;
         gameScene.addChildAt(skyline, 0);
 
-        // Spawn initial pipes
         spawnInitialPipes();
-
-        // Start the game loop using Pixi's ticker
         app.ticker.add(gameLoop);
       }
 
@@ -280,7 +273,7 @@
       }
 
       /***************************************
-       * GAME LOOP & UPDATE FUNCTIONS
+       * GAME LOOP & UPDATE
        ***************************************/
       function gameLoop(delta) {
         let now = performance.now();
@@ -289,11 +282,9 @@
         if (gameState === "play") {
           updateGame(dt);
         }
-        // PixiJS auto-renders the stage.
       }
 
       function updateGame(dt) {
-        // Update bird physics
         if (bird) {
           bird.velocity = bird.velocity || 0;
           bird.velocity += CONFIG.physics.gravity;
@@ -306,7 +297,6 @@
             gameState = "gameover";
           }
         }
-        // Move pipes
         for (let i = 0; i < pipes.length; i++) {
           pipes[i].x -= CONFIG.speeds.scrollSpeed;
         }
@@ -318,7 +308,6 @@
         if (rightmost < CONFIG.designWidth) {
           spawnPipeSet(rightmost + CONFIG.pipe.spacing);
         }
-        // Move ground segments
         for (let i = 0; i < groundSegments.length; i++) {
           groundSegments[i].x -= CONFIG.speeds.scrollSpeed;
         }
@@ -336,7 +325,6 @@
           gameScene.addChild(seg);
           groundSegments.push(seg);
         }
-        // Collision detection (bounding box)
         let birdBox = {
           x: bird.x - bird.width/2,
           y: bird.y - bird.height/2,
@@ -382,27 +370,27 @@
        * RESET GAME FUNCTION
        ***************************************/
       function resetGame() {
-        // Remove pipes
         for (let i = 0; i < pipes.length; i++) {
           gameScene.removeChild(pipes[i]);
         }
         pipes = [];
-        // Reset ground segments
         for (let i = 0; i < groundSegments.length; i++) {
           groundSegments[i].x = i * (app.loader.resources["ground"].texture.width - CONFIG.ground.overlap);
         }
-        // Reset bird position and velocity
         bird.x = CONFIG.bird.startX + CONFIG.bird.width/2;
         bird.y = CONFIG.bird.startY + CONFIG.bird.height/2;
         bird.velocity = 0;
-        // Respawn pipes
         spawnInitialPipes();
       }
 
-      /***************************************
-       * Favicon Warning:
-       * The favicon 404 error can be ignored
-       ***************************************/
+      document.addEventListener("visibilitychange", function() {
+        if (document.hidden) {
+          // Pause the game when the page is hidden
+          // (you could also pause the Pixi ticker if desired)
+        } else if (gameState !== "gameover") {
+          lastTime = performance.now();
+        }
+      });
     </script>
   </body>
 </html>
