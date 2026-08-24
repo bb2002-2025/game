@@ -4,78 +4,83 @@
 <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 <style>
   :root {
-    --bg: #f6f5f3;
-    --panel: #ffffff;
+    --bg: #efece7;
+    --panel: rgba(255,255,255,0.92);
     --ink: #1c1c1c;
     --ink-soft: #6b6b6b;
     --line: #e2e0dc;
     --accent: #1c1c1c;
   }
   * { box-sizing: border-box; }
-  body {
+  html, body {
     margin: 0;
+    height: 100%;
+    overflow: hidden;
     background: var(--bg);
     color: var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    padding: 32px 16px 64px;
-  }
-  .wrap {
-    max-width: 720px;
-    margin: 0 auto;
-  }
-  header {
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  h1 {
-    font-size: 1.4rem;
-    font-weight: 600;
-    margin: 0 0 6px;
-  }
-  header p {
-    color: var(--ink-soft);
-    font-size: 0.92rem;
-    margin: 0;
   }
   model-viewer {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 12px;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: var(--bg);
+    --poster-color: transparent;
   }
-  .controls {
-    margin-top: 24px;
+  .panel {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+    z-index: 10;
+    width: min(320px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
     background: var(--panel);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 20px 22px 6px;
+    border-radius: 14px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+    padding: 16px 18px 8px;
+  }
+  .panel-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0 0 2px;
+  }
+  .panel-sub {
+    font-size: 0.76rem;
+    color: var(--ink-soft);
+    margin: 0 0 10px;
   }
   .control {
-    padding: 16px 0;
-    border-bottom: 1px solid var(--line);
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
   }
-  .control:last-child { border-bottom: none; }
+  .control:first-of-type { border-top: none; }
   .control-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    gap: 8px;
   }
   .control-title {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 600;
   }
   .control-value {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     color: var(--ink-soft);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    flex-shrink: 0;
   }
   .swatch {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 5px;
     border: 1px solid rgba(0,0,0,0.15);
     display: inline-block;
@@ -84,29 +89,36 @@
   input[type="range"] {
     width: 100%;
     accent-color: var(--accent);
+    display: block;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   input[type="color"] {
     -webkit-appearance: none;
     appearance: none;
-    width: 44px;
-    height: 32px;
+    width: 40px;
+    height: 30px;
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 2px;
     background: var(--panel);
     cursor: pointer;
+    flex-shrink: 0;
   }
   input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
   input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
   .tile-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
   }
   .tile-btn {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
     border: 2px solid transparent;
     cursor: pointer;
     padding: 0;
@@ -116,69 +128,112 @@
     box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--accent);
   }
   .hint {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     color: var(--ink-soft);
-    margin-top: 4px;
+    margin-top: 6px;
+    line-height: 1.3;
   }
-  footer {
-    text-align: center;
-    color: var(--ink-soft);
+  .switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .switch-label {
     font-size: 0.78rem;
-    margin-top: 20px;
+    color: var(--ink-soft);
+  }
+  .switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .switch-track {
+    position: absolute;
+    inset: 0;
+    background: #c9c6c0;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .switch-track::before {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  .switch input:checked + .switch-track {
+    background: var(--accent);
+  }
+  .switch input:checked + .switch-track::before {
+    transform: translateX(18px);
   }
 </style>
 
-<div class="wrap">
-  <header>
-    <h1>Color Configurator</h1>
-    <p>Adjust the filament, coating and tile colors below. Drag to orbit, scroll to zoom.</p>
-  </header>
+<model-viewer
+  id="viewer"
+  src="scene.glb"
+  camera-controls
+  touch-action="pan-y"
+  interaction-prompt="none"
+  environment-image="neutral"
+  shadow-intensity="0.9"
+  exposure="1.05"
+  camera-orbit="-24.24deg 63.54deg 1.846m"
+  camera-target="-0.183m -0.187m -0.092m"
+  field-of-view="19.65deg"
+  min-camera-orbit="auto auto 0.6m"
+  max-camera-orbit="auto auto 4m">
+</model-viewer>
 
-  <model-viewer
-    id="viewer"
-    src="scene.glb"
-    camera-controls
-    touch-action="pan-y"
-    interaction-prompt="none"
-    environment-image="neutral"
-    shadow-intensity="0.9"
-    exposure="1.05"
-    camera-orbit="-24.24deg 63.54deg 1.846m"
-    camera-target="-0.183m -0.187m -0.092m"
-    field-of-view="19.65deg"
-    min-camera-orbit="auto auto 0.6m"
-    max-camera-orbit="auto auto 4m">
-  </model-viewer>
+<div class="panel">
+  <p class="panel-title">Color Configurator</p>
+  <p class="panel-sub">Drag to orbit, scroll to zoom</p>
 
-  <div class="controls">
-    <div class="control">
-      <div class="control-head">
-        <span class="control-title">Filament Color</span>
-        <span class="control-value"><span class="swatch" id="filamentSwatch"></span><span id="filamentLabel"></span></span>
-      </div>
-      <input type="range" id="filamentSlider" min="0" max="39" step="1" value="21">
-      <div class="hint">40 printed plastic presets</div>
+  <div class="control">
+    <div class="control-head">
+      <span class="control-title">Filament Color</span>
+      <span class="control-value"><span class="swatch" id="filamentSwatch"></span><span id="filamentLabel"></span></span>
     </div>
-
-    <div class="control">
-      <div class="control-head">
-        <span class="control-title">Black Powder Coating Texture</span>
-        <span class="control-value"><span class="swatch" id="powderSwatch"></span><span id="powderLabel"></span></span>
-      </div>
-      <input type="color" id="powderPicker" value="#046ffc">
-      <div class="hint">Pick any color, the coating darkens and mutes it the same way the real finish does</div>
-    </div>
-
-    <div class="control">
-      <div class="control-head">
-        <span class="control-title">Tile Color Select</span>
-        <span class="control-value"><span class="swatch" id="tileSwatch"></span><span id="tileLabel"></span></span>
-      </div>
-      <div class="tile-row" id="tileRow"></div>
-    </div>
+    <input type="range" id="filamentSlider" min="0" max="39" step="1" value="21">
   </div>
 
-  <footer>Real-time preview, colors are close to the studio render but lighting will differ slightly.</footer>
+  <div class="control">
+    <div class="control-head">
+      <span class="control-title">Black Powder Coating</span>
+      <span class="control-value"><span class="swatch" id="powderSwatch"></span><span id="powderLabel"></span></span>
+    </div>
+    <div class="row">
+      <input type="color" id="powderPicker" value="#046ffc">
+      <div class="switch-row" style="flex:1;">
+        <span class="switch-label">Metallic</span>
+        <label class="switch">
+          <input type="checkbox" id="metallicToggle" checked>
+          <span class="switch-track"></span>
+        </label>
+      </div>
+    </div>
+    <div class="hint">The coating darkens and mutes whatever color you pick, the same way the real finish does</div>
+  </div>
+
+  <div class="control">
+    <div class="control-head">
+      <span class="control-title">Tile Color Select</span>
+      <span class="control-value"><span class="swatch" id="tileSwatch"></span><span id="tileLabel"></span></span>
+    </div>
+    <div class="tile-row" id="tileRow"></div>
+  </div>
 </div>
 
 <script>
@@ -285,11 +340,11 @@
       m.pbrMetallicRoughness.setBaseColorFactor([linearRgb[0], linearRgb[1], linearRgb[2], 1]);
     });
   }
-  function setFixedFinish(materialName, roughness, metallic) {
-    findMaterials(materialName).forEach(m => {
-      m.pbrMetallicRoughness.setRoughnessFactor(roughness);
-      m.pbrMetallicRoughness.setMetallicFactor(metallic);
-    });
+  function setRoughness(materialName, roughness) {
+    findMaterials(materialName).forEach(m => m.pbrMetallicRoughness.setRoughnessFactor(roughness));
+  }
+  function setMetallic(materialName, metallic) {
+    findMaterials(materialName).forEach(m => m.pbrMetallicRoughness.setMetallicFactor(metallic));
   }
 
   function updateFilament(index) {
@@ -302,6 +357,8 @@
     const p = TILE_PALETTE[index];
     document.getElementById("tileSwatch").style.background = p.hex;
     document.getElementById("tileLabel").textContent = p.name;
+    // tints the baked tile/grout texture rather than replacing it, so the
+    // physical tile pattern stays visible under whatever color is picked
     setMaterialColorLinear("Square Wall Tiles", hexToLinear(p.hex));
     document.querySelectorAll(".tile-btn").forEach((btn, i) => btn.classList.toggle("selected", i === index));
   }
@@ -311,6 +368,9 @@
     document.getElementById("powderSwatch").style.background = linearToHex(coated);
     document.getElementById("powderLabel").textContent = linearToHex(coated);
     setMaterialColorLinear("Black Powder Coating Texture", coated);
+  }
+  function updateMetallic(isMetallic) {
+    setMetallic("Black Powder Coating Texture", isMetallic ? 1.0 : 0.0);
   }
 
   // build tile swatch buttons
@@ -326,13 +386,15 @@
 
   document.getElementById("filamentSlider").addEventListener("input", e => updateFilament(parseInt(e.target.value, 10)));
   document.getElementById("powderPicker").addEventListener("input", e => updatePowder(e.target.value));
+  document.getElementById("metallicToggle").addEventListener("change", e => updateMetallic(e.target.checked));
 
   viewer.addEventListener("load", () => {
-    setFixedFinish("Printed plastic", 0.4, 0.0);
-    setFixedFinish("Square Wall Tiles", 0.55, 0.0);
-    setFixedFinish("Black Powder Coating Texture", 0.45, 0.85);
+    setRoughness("Printed plastic", 0.4);
+    setMetallic("Printed plastic", 0.0);
+    setRoughness("Black Powder Coating Texture", 0.45);
     updateFilament(21);
     updateTile(1);
     updatePowder("#046ffc");
+    updateMetallic(document.getElementById("metallicToggle").checked);
   });
 </script>
