@@ -42,54 +42,18 @@
     border: 1px solid var(--line);
     border-radius: 14px;
     box-shadow: 0 8px 28px rgba(0,0,0,0.14);
-    padding: 16px 18px 8px;
-  }
-  .panel-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    margin: 0 0 2px;
-  }
-  .panel-sub {
-    font-size: 0.76rem;
-    color: var(--ink-soft);
-    margin: 0 0 10px;
+    padding: 16px 18px;
   }
   .control {
     padding: 12px 0;
     border-top: 1px solid var(--line);
   }
-  .control:first-of-type { border-top: none; }
-  .control-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    gap: 8px;
-  }
+  .control:first-of-type { border-top: none; padding-top: 0; }
   .control-title {
+    display: block;
     font-size: 0.85rem;
     font-weight: 600;
-  }
-  .control-value {
-    font-size: 0.78rem;
-    color: var(--ink-soft);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-  .swatch {
-    width: 18px;
-    height: 18px;
-    border-radius: 5px;
-    border: 1px solid rgba(0,0,0,0.15);
-    display: inline-block;
-    flex-shrink: 0;
-  }
-  input[type="range"] {
-    width: 100%;
-    accent-color: var(--accent);
-    display: block;
+    margin-bottom: 8px;
   }
   .row {
     display: flex;
@@ -110,10 +74,22 @@
   }
   input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
   input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
-  .tile-row {
+  .swatch-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+  }
+  .lever-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+  }
+  .lever-btn.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--accent);
   }
   .tile-btn {
     width: 28px;
@@ -122,25 +98,12 @@
     border: 2px solid transparent;
     cursor: pointer;
     padding: 0;
+    background-size: cover;
+    background-position: center;
   }
   .tile-btn.selected {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--accent);
-  }
-  .hint {
-    font-size: 0.72rem;
-    color: var(--ink-soft);
-    margin-top: 6px;
-    line-height: 1.3;
-  }
-  .switch-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .switch-label {
-    font-size: 0.78rem;
-    color: var(--ink-soft);
   }
   .switch {
     position: relative;
@@ -179,6 +142,10 @@
   .switch input:checked + .switch-track::before {
     transform: translateX(18px);
   }
+  .switch-label {
+    font-size: 0.8rem;
+    color: var(--ink);
+  }
 </style>
 
 <model-viewer
@@ -198,41 +165,26 @@
 </model-viewer>
 
 <div class="panel">
-  <p class="panel-title">Color Configurator</p>
-  <p class="panel-sub">Drag to orbit, scroll to zoom</p>
-
   <div class="control">
-    <div class="control-head">
-      <span class="control-title">Filament Color</span>
-      <span class="control-value"><span class="swatch" id="filamentSwatch"></span><span id="filamentLabel"></span></span>
-    </div>
-    <input type="range" id="filamentSlider" min="0" max="39" step="1" value="21">
+    <span class="control-title">Lever Color</span>
+    <div class="swatch-grid" id="leverRow"></div>
   </div>
 
   <div class="control">
-    <div class="control-head">
-      <span class="control-title">Black Powder Coating</span>
-      <span class="control-value"><span class="swatch" id="powderSwatch"></span><span id="powderLabel"></span></span>
-    </div>
+    <span class="control-title">Shell Color</span>
     <div class="row">
       <input type="color" id="powderPicker" value="#046ffc">
-      <div class="switch-row" style="flex:1;">
-        <span class="switch-label">Metallic</span>
-        <label class="switch">
-          <input type="checkbox" id="metallicToggle" checked>
-          <span class="switch-track"></span>
-        </label>
-      </div>
+      <label class="switch">
+        <input type="checkbox" id="matteToggle">
+        <span class="switch-track"></span>
+      </label>
+      <span class="switch-label">Matte?</span>
     </div>
-    <div class="hint">The coating darkens and mutes whatever color you pick, the same way the real finish does</div>
   </div>
 
   <div class="control">
-    <div class="control-head">
-      <span class="control-title">Tile Color Select</span>
-      <span class="control-value"><span class="swatch" id="tileSwatch"></span><span id="tileLabel"></span></span>
-    </div>
-    <div class="tile-row" id="tileRow"></div>
+    <span class="control-title">Tile Color Select</span>
+    <div class="swatch-grid" id="tileRow"></div>
   </div>
 </div>
 
@@ -246,16 +198,6 @@
     const g = parseInt(hex.slice(3, 5), 16) / 255;
     const b = parseInt(hex.slice(5, 7), 16) / 255;
     return [srgbToLinearChannel(r), srgbToLinearChannel(g), srgbToLinearChannel(b)];
-  }
-  function linearToSrgbChannel(c) {
-    c = Math.max(0, Math.min(1, c));
-    return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-  }
-  function linearToHex(rgb) {
-    return "#" + rgb.slice(0, 3).map(v => {
-      const s = Math.round(linearToSrgbChannel(v) * 255);
-      return s.toString(16).padStart(2, "0");
-    }).join("");
   }
   function rgbToHsv(r, g, b) {
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -287,8 +229,8 @@
     }
   }
   // Replicates the Blender "Hue/Saturation/Value" node used inside the
-  // Black Powder Coating Texture material: hue offset, saturation scale,
-  // value scale, then blended back by a factor (matches the .blend file).
+  // Shell Color material: hue offset, saturation scale, value scale,
+  // then blended back by a factor (matches the .blend file).
   const POWDER_HSV = { hue: 0.5, saturation: 0.3999999165534973, value: 0.2999999225139618, factor: 1 };
   function applyPowderCoating(linearRgb) {
     let [h, s, v] = rgbToHsv(linearRgb[0], linearRgb[1], linearRgb[2]);
@@ -302,35 +244,31 @@
 
   // ---- presets extracted directly from color_play.blend ----
   const FILAMENT_PALETTE = [
-    {"i":0,"hex":"#e1dfdd","name":"Light Gray"},{"i":1,"hex":"#212122","name":"Black"},
-    {"i":2,"hex":"#959597","name":"Gray"},{"i":3,"hex":"#c4c4c5","name":"Light Gray"},
-    {"i":4,"hex":"#a02727","name":"Dark Red"},{"i":5,"hex":"#c46919","name":"Deep Red"},
-    {"i":6,"hex":"#c4ad27","name":"Deep Yellow"},{"i":7,"hex":"#308938","name":"Dark Green"},
-    {"i":8,"hex":"#5d653c","name":"Dark Green"},{"i":9,"hex":"#2755b3","name":"Deep Blue"},
-    {"i":10,"hex":"#5095c4","name":"Deep Blue"},{"i":11,"hex":"#6f30a0","name":"Dark Purple"},
-    {"i":12,"hex":"#c46c90","name":"Deep Red"},{"i":13,"hex":"#b32781","name":"Deep Red"},
-    {"i":14,"hex":"#76553c","name":"Dark Orange"},{"i":15,"hex":"#b3953f","name":"Deep Orange"},
-    {"i":16,"hex":"#c4b6a0","name":"Orange"},{"i":17,"hex":"#c4a08b","name":"Orange"},
-    {"i":18,"hex":"#c4cea0","name":"Green"},{"i":19,"hex":"#907355","name":"Dark Orange"},
-    {"i":20,"hex":"#e5e6e7","name":"Light Gray"},{"i":21,"hex":"#dad4c4","name":"Orange"},
-    {"i":22,"hex":"#cea681","name":"Orange"},{"i":23,"hex":"#c4816c","name":"Deep Red"},
-    {"i":24,"hex":"#7c273f","name":"Dark Red"},{"i":25,"hex":"#a05938","name":"Dark Red"},
-    {"i":26,"hex":"#89bca0","name":"Green"},{"i":27,"hex":"#277c7c","name":"Dark Teal"},
-    {"i":28,"hex":"#309590","name":"Dark Teal"},{"i":29,"hex":"#27a0aa","name":"Deep Teal"},
-    {"i":30,"hex":"#273f95","name":"Dark Blue"},{"i":31,"hex":"#a090b8","name":"Purple"},
-    {"i":32,"hex":"#ad99b3","name":"Purple"},{"i":33,"hex":"#c43f81","name":"Deep Red"},
-    {"i":34,"hex":"#aa1990","name":"Deep Magenta"},{"i":35,"hex":"#593f2c","name":"Dark Orange"},
-    {"i":36,"hex":"#aa9e81","name":"Orange"},{"i":37,"hex":"#aa7c59","name":"Deep Orange"},
-    {"i":38,"hex":"#957945","name":"Dark Orange"},{"i":39,"hex":"#a0bcc4","name":"Teal"}
+    {"i":0,"hex":"#e1dfdd"},{"i":1,"hex":"#212122"},
+    {"i":2,"hex":"#959597"},{"i":3,"hex":"#c4c4c5"},
+    {"i":4,"hex":"#a02727"},{"i":5,"hex":"#c46919"},
+    {"i":6,"hex":"#c4ad27"},{"i":7,"hex":"#308938"},
+    {"i":8,"hex":"#5d653c"},{"i":9,"hex":"#2755b3"},
+    {"i":10,"hex":"#5095c4"},{"i":11,"hex":"#6f30a0"},
+    {"i":12,"hex":"#c46c90"},{"i":13,"hex":"#b32781"},
+    {"i":14,"hex":"#76553c"},{"i":15,"hex":"#b3953f"},
+    {"i":16,"hex":"#c4b6a0"},{"i":17,"hex":"#c4a08b"},
+    {"i":18,"hex":"#c4cea0"},{"i":19,"hex":"#907355"},
+    {"i":20,"hex":"#e5e6e7"},{"i":21,"hex":"#dad4c4"},
+    {"i":22,"hex":"#cea681"},{"i":23,"hex":"#c4816c"},
+    {"i":24,"hex":"#7c273f"},{"i":25,"hex":"#a05938"},
+    {"i":26,"hex":"#89bca0"},{"i":27,"hex":"#277c7c"},
+    {"i":28,"hex":"#309590"},{"i":29,"hex":"#27a0aa"},
+    {"i":30,"hex":"#273f95"},{"i":31,"hex":"#a090b8"},
+    {"i":32,"hex":"#ad99b3"},{"i":33,"hex":"#c43f81"},
+    {"i":34,"hex":"#aa1990"},{"i":35,"hex":"#593f2c"},
+    {"i":36,"hex":"#aa9e81"},{"i":37,"hex":"#aa7c59"},
+    {"i":38,"hex":"#957945"},{"i":39,"hex":"#a0bcc4"}
   ];
-  const TILE_PALETTE = [
-    {"i":0,"hex":"#dddbd7","name":"Light Gray"},{"i":1,"hex":"#cecabf","name":"Orange"},
-    {"i":2,"hex":"#adadaf","name":"Gray"},{"i":3,"hex":"#69696a","name":"Dark Gray"},
-    {"i":4,"hex":"#b3a48b","name":"Orange"},{"i":5,"hex":"#59735d","name":"Dark Green"},
-    {"i":6,"hex":"#303c55","name":"Dark Blue"},{"i":7,"hex":"#1d1d1f","name":"Black"}
-  ];
+  const TILE_COUNT = 8;
 
   const viewer = document.getElementById("viewer");
+  const tileTextureCache = {};
 
   function findMaterials(name) {
     return viewer.model ? viewer.model.materials.filter(m => m.name === name) : [];
@@ -349,44 +287,55 @@
 
   function updateFilament(index) {
     const p = FILAMENT_PALETTE[index];
-    document.getElementById("filamentSwatch").style.background = p.hex;
-    document.getElementById("filamentLabel").textContent = p.name;
     setMaterialColorLinear("Printed plastic", hexToLinear(p.hex));
+    document.querySelectorAll(".lever-btn").forEach((btn, i) => btn.classList.toggle("selected", i === index));
   }
-  function updateTile(index) {
-    const p = TILE_PALETTE[index];
-    document.getElementById("tileSwatch").style.background = p.hex;
-    document.getElementById("tileLabel").textContent = p.name;
-    // tints the baked tile/grout texture rather than replacing it, so the
-    // physical tile pattern stays visible under whatever color is picked
-    setMaterialColorLinear("Square Wall Tiles", hexToLinear(p.hex));
+
+  async function updateTile(index) {
+    if (!tileTextureCache[index]) {
+      tileTextureCache[index] = await viewer.createTexture("tile_" + index + ".png");
+    }
+    const tex = tileTextureCache[index];
+    findMaterials("Square Wall Tiles").forEach(m => {
+      // use the real baked Blender texture for this preset rather than a tint,
+      // so the physical tile pattern renders exactly as it does in Blender
+      m.pbrMetallicRoughness.baseColorTexture.setTexture(tex);
+      m.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+    });
     document.querySelectorAll(".tile-btn").forEach((btn, i) => btn.classList.toggle("selected", i === index));
   }
+
   function updatePowder(hex) {
     const linear = hexToLinear(hex);
     const coated = applyPowderCoating(linear);
-    document.getElementById("powderSwatch").style.background = linearToHex(coated);
-    document.getElementById("powderLabel").textContent = linearToHex(coated);
     setMaterialColorLinear("Black Powder Coating Texture", coated);
   }
-  function updateMetallic(isMetallic) {
-    setMetallic("Black Powder Coating Texture", isMetallic ? 1.0 : 0.0);
+  function updateMatte(isMatte) {
+    setMetallic("Black Powder Coating Texture", isMatte ? 0.0 : 1.0);
   }
 
-  // build tile swatch buttons
-  const tileRow = document.getElementById("tileRow");
-  TILE_PALETTE.forEach((p, i) => {
+  // build lever (filament) swatch buttons
+  const leverRow = document.getElementById("leverRow");
+  FILAMENT_PALETTE.forEach((p, i) => {
     const btn = document.createElement("button");
-    btn.className = "tile-btn";
+    btn.className = "lever-btn";
     btn.style.background = p.hex;
-    btn.title = p.name;
-    btn.addEventListener("click", () => updateTile(i));
-    tileRow.appendChild(btn);
+    btn.addEventListener("click", () => updateFilament(i));
+    leverRow.appendChild(btn);
   });
 
-  document.getElementById("filamentSlider").addEventListener("input", e => updateFilament(parseInt(e.target.value, 10)));
+  // build tile swatch buttons (thumbnails of the actual baked textures)
+  const tileRow = document.getElementById("tileRow");
+  for (let i = 0; i < TILE_COUNT; i++) {
+    const btn = document.createElement("button");
+    btn.className = "tile-btn";
+    btn.style.backgroundImage = "url('tile_" + i + ".png')";
+    btn.addEventListener("click", () => updateTile(i));
+    tileRow.appendChild(btn);
+  }
+
   document.getElementById("powderPicker").addEventListener("input", e => updatePowder(e.target.value));
-  document.getElementById("metallicToggle").addEventListener("change", e => updateMetallic(e.target.checked));
+  document.getElementById("matteToggle").addEventListener("change", e => updateMatte(e.target.checked));
 
   viewer.addEventListener("load", () => {
     setRoughness("Printed plastic", 0.4);
@@ -395,6 +344,6 @@
     updateFilament(21);
     updateTile(1);
     updatePowder("#046ffc");
-    updateMetallic(document.getElementById("metallicToggle").checked);
+    updateMatte(document.getElementById("matteToggle").checked);
   });
 </script>
