@@ -154,7 +154,7 @@
   camera-controls
   touch-action="pan-y"
   interaction-prompt="none"
-  environment-image="neutral"
+  environment-image="env_hdri.hdr"
   shadow-intensity="0.9"
   exposure="1.05"
   camera-orbit="-24.24deg 63.54deg 1.846m"
@@ -293,7 +293,14 @@
 
   async function updateTile(index) {
     if (!tileTextureCache[index]) {
-      tileTextureCache[index] = await viewer.createTexture("tile_" + index + ".png");
+      const tex = await viewer.createTexture("tile_" + index + ".jpg");
+      // the baked texture covers the wall's UV space exactly once, so clamp
+      // instead of repeat to avoid any GPU-side tiling/bleed at the edges
+      if (tex.sampler) {
+        tex.sampler.setWrapS(33071);
+        tex.sampler.setWrapT(33071);
+      }
+      tileTextureCache[index] = tex;
     }
     const tex = tileTextureCache[index];
     findMaterials("Square Wall Tiles").forEach(m => {
@@ -329,7 +336,7 @@
   for (let i = 0; i < TILE_COUNT; i++) {
     const btn = document.createElement("button");
     btn.className = "tile-btn";
-    btn.style.backgroundImage = "url('tile_" + i + ".png')";
+    btn.style.backgroundImage = "url('tile_" + i + ".jpg')";
     btn.addEventListener("click", () => updateTile(i));
     tileRow.appendChild(btn);
   }
